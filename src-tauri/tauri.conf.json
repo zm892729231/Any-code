@@ -4,7 +4,7 @@
   "version": "5.28.5",
   "identifier": "claude.workbench.app",
   "build": {
-    "beforeDevCommand": "bun run dev",
+    "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../dist"
   },
@@ -40,7 +40,7 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "https://github.com/anyme123/Any-code/releases/latest/download/latest.json"
+        "https://github.com/zm892729231/Any-code/releases/latest/download/latest.json"
       ],
       "dialog": false,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgwRkUyMzM1M0VENEEwMDEKUldRQm9OUStOU1ArZ0hMWjMza3ZXalpSOGZVdlBhNGlIdk1ydlQyNFNFZXpMTVZOYU1aTWpOOEsK"

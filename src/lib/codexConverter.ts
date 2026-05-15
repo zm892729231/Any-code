@@ -318,6 +318,7 @@ export class CodexEventConverter {
             subtype: 'init',
             result: `Codex session started (ID: ${event.payload.id})`,
             session_id: event.payload.id,
+            model: this.activeModel || undefined,
             timestamp: event.payload.timestamp || event.timestamp || new Date().toISOString(),
             receivedAt: event.payload.timestamp || event.timestamp || new Date().toISOString(),
           };

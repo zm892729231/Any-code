@@ -96,6 +96,25 @@ struct ModelPricing {
 fn get_codex_pricing(model: &str) -> ModelPricing {
     let normalized = model.to_lowercase();
 
+    // GPT-5.5 Pro (higher-compute tier, no cached-input discount)
+    if normalized.contains("5.5-pro") || normalized.contains("5_5_pro") {
+        return ModelPricing {
+            input: 30.00,
+            output: 180.00,
+            cache_read: 0.00,
+        };
+    }
+
+    // GPT-5.5 (current flagship)
+    if normalized.contains("gpt-5.5") || normalized.contains("gpt5.5")
+        || normalized.contains("gpt_5_5") || normalized.contains("5.5") {
+        return ModelPricing {
+            input: 5.00,
+            output: 30.00,
+            cache_read: 0.50,
+        };
+    }
+
     // GPT-5.4 Pro (premium tier)
     if normalized.contains("5.4-pro") || normalized.contains("5_4_pro") {
         return ModelPricing {
@@ -211,11 +230,11 @@ fn get_codex_pricing(model: &str) -> ModelPricing {
         };
     }
 
-    // Default to gpt-5.4 pricing
+    // Default to gpt-5.5 pricing
     ModelPricing {
-        input: 2.50,
-        output: 15.00,
-        cache_read: 0.25,
+        input: 5.00,
+        output: 30.00,
+        cache_read: 0.50,
     }
 }
 

@@ -28,6 +28,7 @@ import { useNavigation } from '@/contexts/NavigationContext';
 import { useProject } from '@/contexts/ProjectContext';
 import { useTabs } from '@/hooks/useTabs';
 import { useGlobalKeyboardShortcuts } from '@/hooks/useGlobalKeyboardShortcuts';
+import { selectProjectPath } from '@/lib/sessionHelpers';
 
 type ClaudeCompletePayload = { tab_id?: string | null; payload: boolean } | boolean;
 
@@ -54,7 +55,7 @@ export const ViewRouter: React.FC = () => {
   const { currentView, navigateTo, viewParams, setNavigationInterceptor, goBack } = useNavigation();
   const {
     projects, selectedProject, sessions, loading, error,
-    loadProjects, selectProject, deleteProject, clearSelection, refreshSessions
+    loadProjects, selectProject, registerProjectByPath, deleteProject, clearSelection, refreshSessions
   } = useProject();
   const { openSessionInBackground, switchToTab } = useTabs();
 
@@ -247,6 +248,20 @@ export const ViewRouter: React.FC = () => {
     }
   };
 
+  const handleNewProjectClick = async () => {
+    try {
+      const projectPath = await selectProjectPath();
+      if (!projectPath) {
+        return;
+      }
+
+      await registerProjectByPath(projectPath);
+    } catch (err) {
+      console.error("Failed to open project selector:", err);
+      setToast({ message: `${t('dialogs.openProjectPageFailed')}: ${err}`, type: "error" });
+    }
+  };
+
   // Render Logic
   const renderContent = () => {
     switch (currentView) {
@@ -314,7 +329,7 @@ export const ViewRouter: React.FC = () => {
                     </p>
                   </div>
                   <Button
-                    onClick={() => navigateTo("claude-tab-manager", { initialProjectPath: "__NEW_PROJECT__" })}
+                    onClick={handleNewProjectClick}
                     size="default"
                     className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm transition-all duration-200 hover:shadow-md"
                   >

@@ -36,16 +36,16 @@ export const GEMINI_MODEL_NAMES_UPDATED_EVENT = 'gemini-model-names-updated';
  *
  * @example
  * parseModelDisplayName("claude-sonnet-4-5-20250514")  // "Claude Sonnet 4.5"
- * parseModelDisplayName("claude-opus-4-6-20260101")    // "Claude Opus 4.6"
+ * parseModelDisplayName("claude-opus-4-7-20260101")    // "Claude Opus 4.7"
+ * parseModelDisplayName("claude-opus-4-7")             // "Claude Opus 4.7"
  * parseModelDisplayName("claude-sonnet-4-20250514")    // "Claude Sonnet 4"
  * parseModelDisplayName("claude-haiku-3-5-20241022")   // "Claude Haiku 3.5"
  */
 export function parseModelDisplayName(modelId: string): string | null {
   if (!modelId || typeof modelId !== 'string') return null;
 
-  // Pattern: claude-{family}-{major}[-{minor}[...]]-{date}
-  // The date is always 8 digits at the end
-  const match = modelId.match(/^claude-(\w+)-([\d]+(?:-[\d]+)*)-\d{8}/);
+  // Pattern: claude-{family}-{major}[-{minor}[...]] with an optional 8-digit date suffix
+  const match = modelId.match(/^claude-(\w+)-([\d]+(?:-[\d]+)*)(?:-\d{8})?(?:\[1m\])?$/);
   if (!match) return null;
 
   const family = match[1]; // "sonnet", "opus", "haiku"

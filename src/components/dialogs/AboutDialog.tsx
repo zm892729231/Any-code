@@ -22,7 +22,7 @@ interface AboutDialogProps {
 export function AboutDialog({ open, onClose, onCheckUpdate }: AboutDialogProps) {
   const { t } = useTranslation();
   const [appVersion, setAppVersion] = useState<string>(t('messages.loading'));
-  const PROJECT_URL = "https://github.com/anyme123/Any-code";
+  const PROJECT_URL = "https://github.com/zm892729231/Any-code";
 
   // 动态获取应用版本号
   useEffect(() => {

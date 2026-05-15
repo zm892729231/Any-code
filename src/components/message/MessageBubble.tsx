@@ -46,11 +46,12 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
     >
       {isUser ? (
         // User Message: Modern Bubble
-        <div className="flex flex-col items-end max-w-[85%] sm:max-w-[70%]">
+        <div className="flex flex-col items-end max-w-[92%] sm:max-w-[82%] lg:max-w-[44rem]">
           <div className="flex items-center gap-1.5 justify-end w-full">
             {sideContent}
             <div
               className={cn(
+                "w-fit min-w-[min(18rem,100%)] max-w-full",
                 "rounded-[20px] px-5 py-2.5", // More rounded, slightly tighter padding
                 "bg-secondary text-secondary-foreground", // Use semantic colors
                 "border border-border/50 shadow-sm", // Add subtle border and shadow

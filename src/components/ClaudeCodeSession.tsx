@@ -160,7 +160,7 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
     return {
       engine: 'claude',
       codexMode: 'read-only',
-      codexModel: 'gpt-5.2',
+      codexModel: 'gpt-5.5',
       geminiModel: 'gemini-3-flash',
     };
   });
@@ -1308,4 +1308,3 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = (props) => {
     </MessagesProvider>
   );
 };
-

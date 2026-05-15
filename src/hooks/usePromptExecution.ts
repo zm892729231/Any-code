@@ -20,8 +20,9 @@ import type { ClaudeStreamMessage } from '@/types/claude';
 import type { ModelType } from '@/components/FloatingPromptInput/types';
 // 🔧 FIX: 导入 CodexEventConverter 类，在每个会话中创建独立实例避免全局单例污染
 import { CodexEventConverter, extractCodexRateLimitsFromEvent } from '@/lib/codexConverter';
+import { sanitizeCodexModelId } from '@/lib/codexModelSupport';
 import type { CodexExecutionMode, CodexRateLimits } from '@/types/codex';
-import { cacheModelFromInitMessage } from '@/lib/modelNameParser';
+import { cacheCodexModelFromStream, cacheModelFromInitMessage } from '@/lib/modelNameParser';
 
 // ============================================================================
 // Global Type Declarations
@@ -402,6 +403,9 @@ export function usePromptExecution(config: UsePromptExecutionConfig): UsePromptE
             // 🔧 FIX: 使用会话级别的转换器实例
             const message = sessionCodexConverter.convertEvent(payload);
             if (message) {
+              if (message.model) {
+                cacheCodexModelFromStream(message.model);
+              }
               setMessages(prev => [...prev, message]);
               setRawJsonlOutput((prev) => [...prev, payload]);
 
@@ -1557,8 +1561,9 @@ export function usePromptExecution(config: UsePromptExecutionConfig): UsePromptE
               projectPath,
               prompt: processedPrompt,
               mode: codexMode || 'read-only',
-              model: codexModel || model,
-              json: true
+              model: sanitizeCodexModelId(codexModel || model),
+              json: true,
+              skipGitRepoCheck: true
             });
           } catch (resumeError) {
             // Fallback to resume last if specific resume fails
@@ -1566,8 +1571,9 @@ export function usePromptExecution(config: UsePromptExecutionConfig): UsePromptE
               projectPath,
               prompt: processedPrompt,
               mode: codexMode || 'read-only',
-              model: codexModel || model,
-              json: true
+              model: sanitizeCodexModelId(codexModel || model),
+              json: true,
+              skipGitRepoCheck: true
             });
           }
         } else {
@@ -1577,8 +1583,9 @@ export function usePromptExecution(config: UsePromptExecutionConfig): UsePromptE
             projectPath,
             prompt: processedPrompt,
             mode: codexMode || 'read-only',
-            model: codexModel || model,
-            json: true
+            model: sanitizeCodexModelId(codexModel || model),
+            json: true,
+            skipGitRepoCheck: true
           });
         }
 

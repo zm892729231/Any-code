@@ -4,6 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Popover } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import {
+  DEFAULT_CODEX_MODEL_ID,
+  filterSupportedCodexModels,
+  sanitizeCodexModelId,
+} from "@/lib/codexModelSupport";
+import {
   getCachedCodexModelNames,
   CODEX_MODEL_NAMES_UPDATED_EVENT,
 } from "@/lib/modelNameParser";
@@ -22,63 +27,69 @@ export interface CodexModelConfig {
 /**
  * Default Codex models used as fallback when no cached data is available.
  * Intentionally kept as the known baseline; dynamically discovered models
- * from stream init messages will merge/override these.
- * Updated: March 2026
+ * from stream metadata will merge/override these.
  */
 const DEFAULT_CODEX_MODELS: CodexModelConfig[] = [
   {
-    id: 'gpt-5.4',
-    name: 'GPT-5.4',
-    description: '最强旗舰模型，1M 上下文，支持 /fast（2026年3月）',
+    id: DEFAULT_CODEX_MODEL_ID,
+    name: "GPT-5.5",
+    description: "Newest flagship for coding and professional work, 1.05M context",
     icon: <Star className="h-4 w-4 text-purple-500" />,
     isDefault: true,
   },
   {
-    id: 'gpt-5.3-codex',
-    name: 'GPT-5.3 Codex',
-    description: '专用代码模型，比 5.2 快 25%（2026年2月）',
+    id: "gpt-5.4",
+    name: "GPT-5.4",
+    description: "Previous flagship model, 1.05M context",
+    icon: <Star className="h-4 w-4 text-fuchsia-500" />,
+    isDefault: false,
+  },
+  {
+    id: "gpt-5.3-codex",
+    name: "GPT-5.3 Codex",
+    description: "Code-focused model, faster than GPT-5.2 Codex",
     icon: <Rocket className="h-4 w-4 text-emerald-500" />,
     isDefault: false,
   },
   {
-    id: 'gpt-5.3-codex-spark',
-    name: 'GPT-5.3 Codex Spark',
-    description: '轻量快速版，Cerebras WSE-3 芯片加速',
+    id: "gpt-5.3-codex-spark",
+    name: "GPT-5.3 Codex Spark",
+    description: "Lightweight fast variant",
     icon: <Zap className="h-4 w-4 text-amber-500" />,
     isDefault: false,
   },
   {
-    id: 'gpt-5.2-codex',
-    name: 'GPT-5.2 Codex',
-    description: '上一代代码模型（2025年12月）',
+    id: "gpt-5.2-codex",
+    name: "GPT-5.2 Codex",
+    description: "Previous code model generation",
     icon: <Star className="h-4 w-4 text-yellow-500" />,
     isDefault: false,
   },
   {
-    id: 'gpt-5.2',
-    name: 'GPT 5.2',
-    description: '上一代旗舰模型',
+    id: "gpt-5.2",
+    name: "GPT 5.2",
+    description: "Previous general-purpose flagship",
     icon: <Star className="h-4 w-4 text-yellow-500" />,
     isDefault: false,
   },
   {
-    id: 'gpt-5.1-codex-max',
-    name: 'GPT 5.1 Codex Max',
-    description: 'Balanced speed and quality for code',
+    id: "gpt-5.1-codex-max",
+    name: "GPT 5.1 Codex Max",
+    description: "Balanced speed and quality for code",
     icon: <Rocket className="h-4 w-4 text-green-500" />,
     isDefault: false,
   },
   {
-    id: 'gpt-5.1-codex',
-    name: 'GPT 5.1 Codex',
-    description: 'Code generation baseline',
+    id: "gpt-5.1-codex",
+    name: "GPT 5.1 Codex",
+    description: "Code generation baseline",
     icon: <Cpu className="h-4 w-4 text-blue-500" />,
     isDefault: false,
   },
   {
-    id: 'gpt-5.1',
-    name: 'GPT 5.1',
-    description: 'General-purpose LLM',
+    id: "gpt-5.1",
+    name: "GPT 5.1",
+    description: "General-purpose LLM",
     icon: <Brain className="h-4 w-4 text-orange-500" />,
     isDefault: false,
   },
@@ -90,19 +101,25 @@ const DEFAULT_CODEX_MODELS: CodexModelConfig[] = [
  */
 function getCodexModelIcon(modelId: string): React.ReactNode {
   const lower = modelId.toLowerCase();
-  if (lower.includes('5.4-pro')) {
+  if (lower.includes("5.5-pro")) {
     return <Star className="h-4 w-4 text-red-500" />;
   }
-  if (lower.includes('5.4')) {
+  if (lower.includes("5.5")) {
     return <Star className="h-4 w-4 text-purple-500" />;
   }
-  if (lower.includes('codex') && lower.includes('max')) {
+  if (lower.includes("5.4-pro")) {
+    return <Star className="h-4 w-4 text-red-500" />;
+  }
+  if (lower.includes("5.4")) {
+    return <Star className="h-4 w-4 text-fuchsia-500" />;
+  }
+  if (lower.includes("codex") && lower.includes("max")) {
     return <Rocket className="h-4 w-4 text-green-500" />;
   }
-  if (lower.includes('codex')) {
+  if (lower.includes("codex")) {
     return <Rocket className="h-4 w-4 text-emerald-500" />;
   }
-  if (lower.includes('o3') || lower.includes('o4')) {
+  if (lower.includes("o3") || lower.includes("o4")) {
     return <Brain className="h-4 w-4 text-purple-500" />;
   }
   return <Cpu className="h-4 w-4 text-blue-500" />;
@@ -116,7 +133,6 @@ export function getCodexModels(): CodexModelConfig[] {
   const cached = getCachedCodexModelNames();
   const cachedIds = new Set(Object.keys(cached));
 
-  // Start from defaults, updating display names from cache
   const models: CodexModelConfig[] = DEFAULT_CODEX_MODELS.map((model) => {
     if (cached[model.id]) {
       cachedIds.delete(model.id);
@@ -125,18 +141,17 @@ export function getCodexModels(): CodexModelConfig[] {
     return model;
   });
 
-  // Add any new models discovered from the stream that are not in defaults
   for (const modelId of cachedIds) {
     models.push({
       id: modelId,
       name: cached[modelId],
-      description: 'Discovered from stream',
+      description: "Discovered from session metadata",
       icon: getCodexModelIcon(modelId),
       isDefault: false,
     });
   }
 
-  return models;
+  return filterSupportedCodexModels(models);
 }
 
 /**
@@ -154,8 +169,6 @@ interface CodexModelSelectorProps {
 
 /**
  * CodexModelSelector component - Dropdown for selecting Codex model.
- * Supports dynamic model discovery via localStorage cache and custom events,
- * following the same pattern as Claude's ModelSelector.
  */
 export const CodexModelSelector: React.FC<CodexModelSelectorProps> = ({
   selectedModel,
@@ -166,7 +179,13 @@ export const CodexModelSelector: React.FC<CodexModelSelectorProps> = ({
   const [open, setOpen] = React.useState(false);
   const [dynamicModels, setDynamicModels] = React.useState<CodexModelConfig[]>(() => getCodexModels());
 
-  // Listen for Codex model name updates from stream init messages
+  React.useEffect(() => {
+    const sanitizedModel = sanitizeCodexModelId(selectedModel);
+    if (selectedModel && sanitizedModel && sanitizedModel !== selectedModel) {
+      onModelChange(sanitizedModel);
+    }
+  }, [selectedModel, onModelChange]);
+
   React.useEffect(() => {
     const handleUpdate = () => {
       setDynamicModels(getCodexModels());
@@ -178,12 +197,11 @@ export const CodexModelSelector: React.FC<CodexModelSelectorProps> = ({
     };
   }, []);
 
-  // Allow prop override (same pattern as Claude's ModelSelector)
-  const models = availableModelsProp || dynamicModels;
+  const models = filterSupportedCodexModels(availableModelsProp || dynamicModels);
+  const effectiveSelectedModel = sanitizeCodexModelId(selectedModel) || DEFAULT_CODEX_MODEL_ID;
 
-  // Find selected model or default
-  const selectedModelData = models.find(m => m.id === selectedModel)
-    || models.find(m => m.isDefault)
+  const selectedModelData = models.find((m) => m.id === effectiveSelectedModel)
+    || models.find((m) => m.isDefault)
     || models[0];
 
   return (
@@ -209,8 +227,7 @@ export const CodexModelSelector: React.FC<CodexModelSelectorProps> = ({
             Select Codex Model
           </div>
           {models.map((model) => {
-            const isSelected = selectedModel === model.id ||
-              (!selectedModel && model.isDefault);
+            const isSelected = effectiveSelectedModel === model.id || (!selectedModel && model.isDefault);
             return (
               <button
                 key={model.id}

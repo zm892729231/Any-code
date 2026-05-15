@@ -4,17 +4,18 @@ import { getCachedModelNames } from "@/lib/modelNameParser";
 
 /**
  * Default model display names (used when no cache is available).
- * Intentionally version-less so they never go stale.
+ * These mirror the current Claude Code family defaults, while cached
+ * session metadata still takes precedence when we know the exact model.
  */
 const DEFAULT_MODEL_NAMES: Record<string, string> = {
   sonnet: "Claude Sonnet 4.6",
-  opus: "Claude Opus 4.6",
+  opus: "Claude Opus 4.7",
 };
 
 /**
  * Get available models with dynamically updated display names.
  * Reads cached model names from localStorage (populated by stream init messages).
- * Falls back to version-less defaults if no cache exists yet.
+ * Falls back to the current documented Claude Code defaults if no cache exists yet.
  */
 export function getModels(): ModelConfig[] {
   const cached = getCachedModelNames();

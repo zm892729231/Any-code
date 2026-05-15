@@ -1,10 +1,9 @@
-/**
+﻿/**
  * Official Claude Token Counter Service
  *
- * 基于Claude官方Token Count API的准确token计算服务
- * 支持所有消息类型和Claude模型的精确token统计和成本计算
- *
- * 2026年最新官方定价和Claude 4.6系列模型支持
+ * 鍩轰簬Claude瀹樻柟Token Count API鐨勫噯纭畉oken璁＄畻鏈嶅姟
+ * 鏀寔鎵€鏈夋秷鎭被鍨嬪拰Claude妯″瀷鐨勭簿纭畉oken缁熻鍜屾垚鏈绠? *
+ * 2026骞存渶鏂板畼鏂瑰畾浠峰拰Claude 4.7/4.6绯诲垪妯″瀷鏀寔
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -12,14 +11,21 @@ import { api } from './api';
 
 // ============================================================================
 // Claude Model Pricing - MUST MATCH BACKEND (usage.rs)
-// ⚠️ WARNING: This pricing table MUST be kept in sync with:
+// 鈿狅笍 WARNING: This pricing table MUST be kept in sync with:
 //    src-tauri/src/commands/usage.rs::ModelPricing
 // Source: https://docs.claude.com/en/docs/about-claude/models/overview
-// Last Updated: February 2026
+// Last Updated: May 2026
 // ============================================================================
 
 export const CLAUDE_PRICING = {
-  // Claude 4.6 Series (Latest - February 2026)
+  // Claude 4.7 Series (Latest - May 2026)
+  'claude-opus-4-7': {
+    input: 15.0,
+    output: 75.0,
+    cache_write: 18.75,
+    cache_read: 1.50,
+  },
+  // Claude 4.6 Series
   'claude-opus-4-6': {
     input: 15.0,
     output: 75.0,
@@ -82,7 +88,7 @@ export const CLAUDE_PRICING = {
     cache_write: 18.75,
     cache_read: 1.50,
   },
-  // 默认值 (使用最新 Sonnet 4.6 定价)
+  // 榛樿鍊?(浣跨敤鏈€鏂?Sonnet 4.6 瀹氫环)
   'default': {
     input: 3.0,
     output: 15.0,
@@ -93,13 +99,14 @@ export const CLAUDE_PRICING = {
 
 // ============================================================================
 // AI Model Context Windows
-// 各模型的上下文窗口大小（tokens）
-// Claude: https://docs.claude.com/en/docs/about-claude/models/overview
-// Codex: https://github.com/openai/codex (官方文档)
+// 鍚勬ā鍨嬬殑涓婁笅鏂囩獥鍙ｅぇ灏忥紙tokens锛?// Claude: https://docs.claude.com/en/docs/about-claude/models/overview
+// Codex: https://github.com/openai/codex (瀹樻柟鏂囨。)
 // ============================================================================
 
 export const CLAUDE_CONTEXT_WINDOWS = {
-  // Claude 4.6 Series
+  // Claude 4.7 / 4.6 Series
+  'claude-opus-4-7': 200000,
+  'claude-opus-4-7[1m]': 1000000,
   'claude-opus-4-6': 200000,
   'claude-opus-4-6[1m]': 1000000,
   'claude-sonnet-4-6': 200000,
@@ -114,8 +121,8 @@ export const CLAUDE_CONTEXT_WINDOWS = {
   // Claude 4.1 Series
   'claude-opus-4-1': 200000,
   'claude-opus-4-1-20250805': 200000,
-  // 默认值
   'default': 200000,
+  // 榛樿鍊?  'default': 200000,
 } as const;
 
 // ============================================================================
@@ -124,23 +131,27 @@ export const CLAUDE_CONTEXT_WINDOWS = {
 // ============================================================================
 
 export const CODEX_CONTEXT_WINDOWS = {
-  // GPT-5.3-Codex 系列 - 最新代码模型（2026年2月发布）
+  'gpt-5.5': 1_050_000,
+  'gpt-5.5-pro': 1_050_000,
+  'gpt-5.4': 1_050_000,
+  'gpt-5.4-pro': 1_050_000,
+  // GPT-5.3-Codex 绯诲垪 - 鏈€鏂颁唬鐮佹ā鍨嬶紙2026骞?鏈堝彂甯冿級
   // 400K context window, 128K max output
   'gpt-5.3-codex': 400000,
   'gpt-5.3-codex-spark': 400000,
-  // GPT-5.2 系列
+  // GPT-5.2 绯诲垪
   'gpt-5.2': 272000,
   'gpt-5.2-codex': 272000,
-  // GPT-5.1-Codex 系列
+  // GPT-5.1-Codex 绯诲垪
   'gpt-5.1-codex': 272000,
   'gpt-5.1-codex-mini': 272000,
   'gpt-5.1-codex-max': 272000,
   'gpt-5-codex': 272000,
   'codex-mini-latest': 272000,
-  // o4-mini (Codex 底层模型)
+  // o4-mini (Codex 搴曞眰妯″瀷)
   'o4-mini': 128000,
-  // 默认值
   'default': 400000,
+  // 榛樿鍊?  'default': 400000,
 } as const;
 
 // ============================================================================
@@ -163,19 +174,17 @@ export const GEMINI_CONTEXT_WINDOWS = {
 } as const;
 
 /**
- * 获取模型的上下文窗口大小
- * @param model - 模型名称
- * @param engine - 引擎类型（claude/codex/gemini）
- * @returns 上下文窗口大小（tokens）
- */
+ * 鑾峰彇妯″瀷鐨勪笂涓嬫枃绐楀彛澶у皬
+ * @param model - 妯″瀷鍚嶇О
+ * @param engine - 寮曟搸绫诲瀷锛坈laude/codex/gemini锛? * @returns 涓婁笅鏂囩獥鍙ｅぇ灏忥紙tokens锛? */
 export function getContextWindowSize(model?: string, engine?: string): number {
-  // Gemini 引擎
+  // Gemini 寮曟搸
   if (engine === 'gemini') {
     if (!model) return GEMINI_CONTEXT_WINDOWS['default'];
 
     const lowerModel = model.toLowerCase();
 
-    // 处理 Vertex AI / provider 前缀与版本后缀
+    // 澶勭悊 Vertex AI / provider 鍓嶇紑涓庣増鏈悗缂€
     const normalized = lowerModel
       .replace('google.', '')
       .replace('vertex.', '')
@@ -186,7 +195,7 @@ export function getContextWindowSize(model?: string, engine?: string): number {
       return GEMINI_CONTEXT_WINDOWS[normalized as keyof typeof GEMINI_CONTEXT_WINDOWS];
     }
 
-    // 常见变体：-exp / -preview / 版本日期后缀等 -> 回退到家族默认 1M
+    // 甯歌鍙樹綋锛?exp / -preview / 鐗堟湰鏃ユ湡鍚庣紑绛?-> 鍥為€€鍒板鏃忛粯璁?1M
     if (normalized.startsWith('gemini-')) {
       return GEMINI_CONTEXT_WINDOWS['default'];
     }
@@ -194,18 +203,31 @@ export function getContextWindowSize(model?: string, engine?: string): number {
     return GEMINI_CONTEXT_WINDOWS['default'];
   }
 
-  // Codex 引擎
+  // Codex 寮曟搸
   if (engine === 'codex') {
     if (!model) return CODEX_CONTEXT_WINDOWS['default'];
 
     const lowerModel = model.toLowerCase();
 
-    // 尝试直接匹配
+    // 灏濊瘯鐩存帴鍖归厤
     if (lowerModel in CODEX_CONTEXT_WINDOWS) {
       return CODEX_CONTEXT_WINDOWS[lowerModel as keyof typeof CODEX_CONTEXT_WINDOWS];
     }
 
-    // GPT-5.3-Codex 系列（最新）
+    if (lowerModel.includes('5.5-pro') || lowerModel.includes('5_5_pro')) {
+      return CODEX_CONTEXT_WINDOWS['gpt-5.5-pro'];
+    }
+    if (lowerModel.includes('gpt-5.5') || lowerModel.includes('gpt_5_5') || lowerModel.includes('5.5')) {
+      return CODEX_CONTEXT_WINDOWS['gpt-5.5'];
+    }
+    if (lowerModel.includes('5.4-pro') || lowerModel.includes('5_4_pro')) {
+      return CODEX_CONTEXT_WINDOWS['gpt-5.4-pro'];
+    }
+    if (lowerModel.includes('gpt-5.4') || lowerModel.includes('gpt_5_4') || lowerModel.includes('5.4')) {
+      return CODEX_CONTEXT_WINDOWS['gpt-5.4'];
+    }
+
+    // GPT-5.3-Codex 绯诲垪锛堟渶鏂帮級
     if (lowerModel.includes('5.3-codex-spark') || lowerModel.includes('5_3_codex_spark')) {
       return CODEX_CONTEXT_WINDOWS['gpt-5.3-codex-spark'];
     }
@@ -216,7 +238,7 @@ export function getContextWindowSize(model?: string, engine?: string): number {
       return CODEX_CONTEXT_WINDOWS['gpt-5.3-codex'];
     }
 
-    // GPT-5.1-Codex 系列
+    // GPT-5.1-Codex 绯诲垪
     if (lowerModel.includes('5.1-codex-max') || lowerModel.includes('5_1_codex_max')) {
       return CODEX_CONTEXT_WINDOWS['gpt-5.1-codex-max'];
     }
@@ -227,7 +249,7 @@ export function getContextWindowSize(model?: string, engine?: string): number {
       return CODEX_CONTEXT_WINDOWS['gpt-5.1-codex'];
     }
 
-    // GPT-5.2 系列
+    // GPT-5.2 绯诲垪
     if (lowerModel.includes('5.2-codex') || lowerModel.includes('5_2_codex')) {
       return CODEX_CONTEXT_WINDOWS['gpt-5.2-codex'];
     }
@@ -240,17 +262,17 @@ export function getContextWindowSize(model?: string, engine?: string): number {
       return CODEX_CONTEXT_WINDOWS['o4-mini'];
     }
 
-    // codex-mini-latest - 默认 CLI 模型
+    // codex-mini-latest - 榛樿 CLI 妯″瀷
     if (lowerModel.includes('codex-mini-latest') || lowerModel.includes('codex_mini_latest')) {
       return CODEX_CONTEXT_WINDOWS['codex-mini-latest'];
     }
 
-    // gpt-5-codex (别名)
+    // gpt-5-codex (鍒悕)
     if (lowerModel.includes('gpt-5-codex') || lowerModel.includes('gpt_5_codex')) {
       return CODEX_CONTEXT_WINDOWS['gpt-5-codex'];
     }
 
-    // 通用 Codex 匹配 - 默认使用 codex-mini-latest (200K)
+    // 閫氱敤 Codex 鍖归厤 - 榛樿浣跨敤 codex-mini-latest (200K)
     if (lowerModel.includes('codex')) {
       return CODEX_CONTEXT_WINDOWS['codex-mini-latest'];
     }
@@ -258,15 +280,15 @@ export function getContextWindowSize(model?: string, engine?: string): number {
     return CODEX_CONTEXT_WINDOWS['default'];
   }
 
-  // Claude 引擎（默认）
+  // Claude 寮曟搸锛堥粯璁わ級
   if (!model) return CLAUDE_CONTEXT_WINDOWS['default'];
 
-  // 尝试直接匹配
+  // 灏濊瘯鐩存帴鍖归厤
   if (model in CLAUDE_CONTEXT_WINDOWS) {
     return CLAUDE_CONTEXT_WINDOWS[model as keyof typeof CLAUDE_CONTEXT_WINDOWS];
   }
 
-  // 尝试通过别名匹配
+  // 灏濊瘯閫氳繃鍒悕鍖归厤
   const normalizedModel = MODEL_ALIASES[model as keyof typeof MODEL_ALIASES];
   if (normalizedModel && normalizedModel in CLAUDE_CONTEXT_WINDOWS) {
     return CLAUDE_CONTEXT_WINDOWS[normalizedModel as keyof typeof CLAUDE_CONTEXT_WINDOWS];
@@ -274,30 +296,30 @@ export function getContextWindowSize(model?: string, engine?: string): number {
 
   return CLAUDE_CONTEXT_WINDOWS['default'];
 }
-
-// 标准化模型名称映射
 export const MODEL_ALIASES = {
-  'opus': 'claude-opus-4-6', // 默认最新版本
-  'opus1m': 'claude-opus-4-6[1m]',
+  'opus': 'claude-opus-4-7',
+  'opus1m': 'claude-opus-4-7[1m]',
+  'opus4.7': 'claude-opus-4-7',
+  'opus-4.7': 'claude-opus-4-7',
   'opus4.6': 'claude-opus-4-6',
   'opus-4.6': 'claude-opus-4-6',
   'opus4.5': 'claude-opus-4-5',
   'opus-4.5': 'claude-opus-4-5',
   'opus4.1': 'claude-opus-4-1',
   'opus-4.1': 'claude-opus-4-1',
-  'sonnet': 'claude-sonnet-4-6', // 默认最新版本
+  'sonnet': 'claude-sonnet-4-6',
   'sonnet1m': 'claude-sonnet-4-6[1m]',
   'sonnet4.6': 'claude-sonnet-4-6',
   'sonnet-4.6': 'claude-sonnet-4-6',
   'sonnet4.5': 'claude-sonnet-4-5',
   'sonnet-4.5': 'claude-sonnet-4-5',
-  'haiku': 'claude-haiku-4-5', // 默认最新版本
+  'haiku': 'claude-haiku-4-5',
   'haiku4.5': 'claude-haiku-4-5',
   'haiku-4.5': 'claude-haiku-4-5',
 } as const;
 
 /**
- * ✅ Token使用统计接口
+ * 鉁?Token浣跨敤缁熻鎺ュ彛
  *
  * @deprecated Consider using StandardizedTokenUsage from tokenExtractor.ts for new code.
  * This interface is kept for backward compatibility with existing code.
@@ -316,7 +338,7 @@ export interface TokenUsage {
   cache_read_tokens?: number;
 }
 
-// 消息接口
+// 娑堟伅鎺ュ彛
 export interface ClaudeMessage {
   role: 'user' | 'assistant' | 'system';
   content: string | Array<{
@@ -330,7 +352,7 @@ export interface ClaudeMessage {
   }>;
 }
 
-// 工具定义接口
+// 宸ュ叿瀹氫箟鎺ュ彛
 export interface ClaudeTool {
   name: string;
   description: string;
@@ -341,24 +363,24 @@ export interface ClaudeTool {
   };
 }
 
-// Token计算响应接口
+// Token璁＄畻鍝嶅簲鎺ュ彛
 export interface TokenCountResponse {
   input_tokens: number;
   cache_creation_input_tokens?: number;
   cache_read_input_tokens?: number;
 }
 
-// 成本分析结果
+// 鎴愭湰鍒嗘瀽缁撴灉
 export interface CostBreakdown {
   input_cost: number;
   output_cost: number;
   cache_write_cost: number;
   cache_read_cost: number;
   total_cost: number;
-  total: number; // 向后兼容字段
+  total: number; // 鍚戝悗鍏煎瀛楁
 }
 
-// Token明细分析
+// Token鏄庣粏鍒嗘瀽
 export interface TokenBreakdown {
   total: number;
   input: number;
@@ -382,11 +404,10 @@ export class TokenCounterService {
   }
 
   /**
-   * 初始化Anthropic客户端
-   */
+   * 鍒濆鍖朅nthropic瀹㈡埛绔?   */
   private async initialize() {
     try {
-      // 从多个来源获取API密钥
+      // 浠庡涓潵婧愯幏鍙朅PI瀵嗛挜
       this.apiKey = this.getApiKey();
       this.baseURL = this.getBaseURL();
 
@@ -400,28 +421,28 @@ export class TokenCounterService {
         });
       }
     } catch (error) {
-      console.warn('[TokenCounter] 初始化失败，将使用估算方法:', error);
+      console.warn('[TokenCounter] 鍒濆鍖栧け璐ワ紝灏嗕娇鐢ㄤ及绠楁柟娉?', error);
     }
   }
 
   /**
-   * 获取API密钥
+   * 鑾峰彇API瀵嗛挜
    */
   private getApiKey(): string | null {
-    // 1. 环境变量
+    // 1. 鐜鍙橀噺
     if (typeof window !== 'undefined') {
-      // 浏览器环境
-      return null; // 浏览器中不应直接使用API密钥
+      // 娴忚鍣ㄧ幆澧?      return null; // 娴忚鍣ㄤ腑涓嶅簲鐩存帴浣跨敤API瀵嗛挜
+      return null;
     }
 
-    // Node.js环境
+    // Node.js鐜
     return process.env.ANTHROPIC_API_KEY ||
            process.env.ANTHROPIC_AUTH_TOKEN ||
            null;
   }
 
   /**
-   * 获取基础URL
+   * 鑾峰彇鍩虹URL
    */
   private getBaseURL(): string | null {
     if (typeof window !== 'undefined') {
@@ -434,8 +455,7 @@ export class TokenCounterService {
   }
 
   /**
-   * 标准化模型名称
-   * ⚠️ MUST MATCH: src-tauri/src/commands/usage.rs::parse_model_family
+   * 鏍囧噯鍖栨ā鍨嬪悕绉?   * 鈿狅笍 MUST MATCH: src-tauri/src/commands/usage.rs::parse_model_family
    *
    * This function replicates the backend logic to ensure consistent
    * model identification and pricing across frontend and backend.
@@ -456,7 +476,12 @@ export class TokenCounterService {
 
     // Priority-based matching (order matters! MUST match backend logic)
 
-    // Claude 4.6 Series (Latest)
+    // Claude 4.7 Series (Latest)
+    if (normalized.includes('opus') && (normalized.includes('4.7') || normalized.includes('4-7'))) {
+      return 'claude-opus-4-7';
+    }
+
+    // Claude 4.6 Series
     if (normalized.includes('opus') && (normalized.includes('4.6') || normalized.includes('4-6'))) {
       return 'claude-opus-4-6';
     }
@@ -485,7 +510,7 @@ export class TokenCounterService {
       return 'claude-haiku-4-5'; // Default to latest
     }
     if (normalized.includes('opus')) {
-      return 'claude-opus-4-6'; // Default to latest
+      return 'claude-opus-4-7'; // Default to latest
     }
     if (normalized.includes('sonnet')) {
       return 'claude-sonnet-4-6'; // Default to latest
@@ -497,7 +522,7 @@ export class TokenCounterService {
   }
 
   /**
-   * 使用官方API计算token数量
+   * 浣跨敤瀹樻柟API璁＄畻token鏁伴噺
    */
   async countTokens(
     messages: ClaudeMessage[],
@@ -507,7 +532,7 @@ export class TokenCounterService {
   ): Promise<TokenCountResponse> {
     const normalizedModel = this.normalizeModel(model);
 
-    // 如果客户端不可用，使用估算方法
+    // 濡傛灉瀹㈡埛绔笉鍙敤锛屼娇鐢ㄤ及绠楁柟娉?    if (!this.client) {
     if (!this.client) {
       return this.estimateTokens(messages, tools, systemPrompt);
     }
@@ -537,14 +562,13 @@ export class TokenCounterService {
         cache_read_input_tokens: (response as any).cache_read_input_tokens,
       };
     } catch (error) {
-      console.warn('[TokenCounter] API调用失败，使用估算方法:', error);
+      console.warn('[TokenCounter] API璋冪敤澶辫触锛屼娇鐢ㄤ及绠楁柟娉?', error);
       return this.estimateTokens(messages, tools, systemPrompt);
     }
   }
 
   /**
-   * 降级估算方法（当API不可用时）
-   */
+   * 闄嶇骇浼扮畻鏂规硶锛堝綋API涓嶅彲鐢ㄦ椂锛?   */
   private estimateTokens(
     messages: ClaudeMessage[],
     tools?: ClaudeTool[],
@@ -552,29 +576,29 @@ export class TokenCounterService {
   ): TokenCountResponse {
     let totalTokens = 0;
 
-    // 估算消息token
+    // 浼扮畻娑堟伅token
     for (const message of messages) {
       if (typeof message.content === 'string') {
-        totalTokens += Math.ceil(message.content.length / 4); // 粗略估算：4字符=1token
+        totalTokens += Math.ceil(message.content.length / 4); // 绮楃暐浼扮畻锛?瀛楃=1token
       } else if (Array.isArray(message.content)) {
         for (const content of message.content) {
           if (content.type === 'text' && content.text) {
             totalTokens += Math.ceil(content.text.length / 4);
           } else if (content.type === 'image') {
-            totalTokens += 1551; // 基于官方文档的图像token估算
+            totalTokens += 1551; // 鍩轰簬瀹樻柟鏂囨。鐨勫浘鍍弔oken浼扮畻
           } else if (content.type === 'document') {
-            totalTokens += 2188; // 基于官方文档的PDF token估算
+            totalTokens += 2188; // 鍩轰簬瀹樻柟鏂囨。鐨凱DF token浼扮畻
           }
         }
       }
     }
 
-    // 估算系统提示token
+    // 浼扮畻绯荤粺鎻愮ずtoken
     if (systemPrompt) {
       totalTokens += Math.ceil(systemPrompt.length / 4);
     }
 
-    // 估算工具定义token
+    // 浼扮畻宸ュ叿瀹氫箟token
     if (tools && tools.length > 0) {
       const toolsJson = JSON.stringify(tools);
       totalTokens += Math.ceil(toolsJson.length / 4);
@@ -586,7 +610,7 @@ export class TokenCounterService {
   }
 
   /**
-   * 批量计算token（并行处理）
+   * 鎵归噺璁＄畻token锛堝苟琛屽鐞嗭級
    */
   async batchCountTokens(
     requests: Array<{
@@ -602,8 +626,8 @@ export class TokenCounterService {
       );
       return await Promise.all(promises);
     } catch (error) {
-      console.error('[TokenCounter] 批量计算失败:', error);
-      // 降级到逐个计算
+      console.error('[TokenCounter] 鎵归噺璁＄畻澶辫触:', error);
+      // 闄嶇骇鍒伴€愪釜璁＄畻
       const results: TokenCountResponse[] = [];
       for (const req of requests) {
         try {
@@ -618,21 +642,21 @@ export class TokenCounterService {
   }
 
   /**
-   * 计算成本
+   * 璁＄畻鎴愭湰
    */
   calculateCost(usage: TokenUsage, model?: string): CostBreakdown {
     const normalizedModel = this.normalizeModel(model);
     const pricing = CLAUDE_PRICING[normalizedModel as keyof typeof CLAUDE_PRICING];
 
     if (!pricing) {
-      console.warn(`[TokenCounter] 未知模型定价: ${normalizedModel}`);
+      console.warn(`[TokenCounter] 鏈煡妯″瀷瀹氫环: ${normalizedModel}`);
       return {
         input_cost: 0,
         output_cost: 0,
         cache_write_cost: 0,
         cache_read_cost: 0,
         total_cost: 0,
-        total: 0, // 向后兼容字段
+        total: 0, // 鍚戝悗鍏煎瀛楁
       };
     }
 
@@ -653,12 +677,12 @@ export class TokenCounterService {
       cache_write_cost,
       cache_read_cost,
       total_cost,
-      total: total_cost, // 向后兼容字段
+      total: total_cost, // 鍚戝悗鍏煎瀛楁
     };
   }
 
   /**
-   * 获取详细的token明细分析
+   * 鑾峰彇璇︾粏鐨則oken鏄庣粏鍒嗘瀽
    */
   calculateBreakdown(usage: TokenUsage, model?: string): TokenBreakdown {
     const normalized = this.normalizeUsage(usage);
@@ -669,7 +693,7 @@ export class TokenCounterService {
 
     const cache_hit_rate = total > 0 ? ((normalized.cache_read_tokens || 0) / total) * 100 : 0;
 
-    // 计算缓存节约的成本
+    // 璁＄畻缂撳瓨鑺傜害鐨勬垚鏈?    const standard_cost = ((normalized.cache_read_tokens || 0) *
     const standard_cost = ((normalized.cache_read_tokens || 0) *
                           (CLAUDE_PRICING[this.normalizeModel(model) as keyof typeof CLAUDE_PRICING]?.input || 3)) / 1_000_000;
     const actual_cache_cost = cost.cache_read_cost;
@@ -690,9 +714,9 @@ export class TokenCounterService {
   }
 
   /**
-   * 标准化token使用数据
+   * 鏍囧噯鍖杢oken浣跨敤鏁版嵁
    *
-   * ⚠️ This method now delegates to tokenExtractor.ts for unified token normalization.
+   * 鈿狅笍 This method now delegates to tokenExtractor.ts for unified token normalization.
    * All token standardization logic is centralized in tokenExtractor.ts
    */
   normalizeUsage(usage: TokenUsage): Required<TokenUsage> {
@@ -712,7 +736,7 @@ export class TokenCounterService {
   }
 
   /**
-   * 格式化token数量显示
+   * 鏍煎紡鍖杢oken鏁伴噺鏄剧ず
    */
   formatCount(count: number): string {
     if (count >= 1_000_000) {
@@ -724,8 +748,7 @@ export class TokenCounterService {
   }
 
   /**
-   * 格式化成本显示
-   */
+   * 鏍煎紡鍖栨垚鏈樉绀?   */
   formatCost(cost: number): string {
     if (cost >= 1) {
       return `$${cost.toFixed(2)}`;
@@ -740,7 +763,7 @@ export class TokenCounterService {
   }
 
   /**
-   * 格式化token明细显示
+   * 鏍煎紡鍖杢oken鏄庣粏鏄剧ず
    */
   formatBreakdown(
     usage: TokenUsage,
@@ -763,7 +786,7 @@ export class TokenCounterService {
       let result = parts.join(', ');
 
       if (options.includeCost && breakdown.cost.total_cost > 0) {
-        result += ` • ${this.formatCost(breakdown.cost.total_cost)}`;
+        result += ` 鈥?${this.formatCost(breakdown.cost.total_cost)}`;
       }
 
       if (options.includeEfficiency && breakdown.efficiency.cache_hit_rate > 0) {
@@ -777,8 +800,7 @@ export class TokenCounterService {
   }
 
   /**
-   * 创建详细的工具提示内容
-   */
+   * 鍒涘缓璇︾粏鐨勫伐鍏锋彁绀哄唴瀹?   */
   createTooltip(usage: TokenUsage, model?: string): string {
     const breakdown = this.calculateBreakdown(usage, model);
     const normalizedModel = this.normalizeModel(model);
@@ -786,74 +808,73 @@ export class TokenCounterService {
 
     const lines: string[] = [];
 
-    lines.push(`模型: ${normalizedModel}`);
-    lines.push(`总Token: ${breakdown.total.toLocaleString()}`);
+    lines.push(`妯″瀷: ${normalizedModel}`);
+    lines.push(`鎬籘oken: ${breakdown.total.toLocaleString()}`);
     lines.push('');
 
-    // Token明细
+    // Token鏄庣粏
     if (breakdown.input > 0) {
-      lines.push(`输入Token: ${breakdown.input.toLocaleString()}`);
+      lines.push(`杈撳叆Token: ${breakdown.input.toLocaleString()}`);
     }
     if (breakdown.output > 0) {
-      lines.push(`输出Token: ${breakdown.output.toLocaleString()}`);
+      lines.push(`杈撳嚭Token: ${breakdown.output.toLocaleString()}`);
     }
     if (breakdown.cache_write > 0) {
-      lines.push(`缓存写入: ${breakdown.cache_write.toLocaleString()}`);
+      lines.push(`缂撳瓨鍐欏叆: ${breakdown.cache_write.toLocaleString()}`);
     }
     if (breakdown.cache_read > 0) {
-      lines.push(`缓存读取: ${breakdown.cache_read.toLocaleString()}`);
+      lines.push(`缂撳瓨璇诲彇: ${breakdown.cache_read.toLocaleString()}`);
     }
 
-    // 成本明细
+    // 鎴愭湰鏄庣粏
     if (breakdown.cost.total_cost > 0) {
       lines.push('');
-      lines.push(`总成本: ${this.formatCost(breakdown.cost.total_cost)}`);
+      lines.push(`鎬绘垚鏈? ${this.formatCost(breakdown.cost.total_cost)}`);
 
       if (breakdown.cost.input_cost > 0) {
-        lines.push(`输入成本: ${this.formatCost(breakdown.cost.input_cost)}`);
+        lines.push(`杈撳叆鎴愭湰: ${this.formatCost(breakdown.cost.input_cost)}`);
       }
       if (breakdown.cost.output_cost > 0) {
-        lines.push(`输出成本: ${this.formatCost(breakdown.cost.output_cost)}`);
+        lines.push(`杈撳嚭鎴愭湰: ${this.formatCost(breakdown.cost.output_cost)}`);
       }
       if (breakdown.cost.cache_write_cost > 0) {
-        lines.push(`缓存写入成本: ${this.formatCost(breakdown.cost.cache_write_cost)}`);
+        lines.push(`缂撳瓨鍐欏叆鎴愭湰: ${this.formatCost(breakdown.cost.cache_write_cost)}`);
       }
       if (breakdown.cost.cache_read_cost > 0) {
-        lines.push(`缓存读取成本: ${this.formatCost(breakdown.cost.cache_read_cost)}`);
+        lines.push(`缂撳瓨璇诲彇鎴愭湰: ${this.formatCost(breakdown.cost.cache_read_cost)}`);
       }
     }
 
-    // 效率指标
+    // 鏁堢巼鎸囨爣
     if (breakdown.efficiency.cache_hit_rate > 0) {
       lines.push('');
-      lines.push(`缓存命中率: ${breakdown.efficiency.cache_hit_rate.toFixed(1)}%`);
+      lines.push(`缂撳瓨鍛戒腑鐜? ${breakdown.efficiency.cache_hit_rate.toFixed(1)}%`);
       if (breakdown.efficiency.cost_savings > 0) {
-        lines.push(`成本节约: ${this.formatCost(breakdown.efficiency.cost_savings)}`);
+        lines.push(`鎴愭湰鑺傜害: ${this.formatCost(breakdown.efficiency.cost_savings)}`);
       }
     }
 
-    // 定价信息
+    // 瀹氫环淇℃伅
     if (pricing) {
       lines.push('');
-      lines.push('定价 (每百万token):');
-      lines.push(`输入: $${pricing.input}`);
-      lines.push(`输出: $${pricing.output}`);
-      lines.push(`缓存写入: $${pricing.cache_write}`);
-      lines.push(`缓存读取: $${pricing.cache_read}`);
+      lines.push('瀹氫环 (姣忕櫨涓噒oken):');
+      lines.push(`杈撳叆: $${pricing.input}`);
+      lines.push(`杈撳嚭: $${pricing.output}`);
+      lines.push(`缂撳瓨鍐欏叆: $${pricing.cache_write}`);
+      lines.push(`缂撳瓨璇诲彇: $${pricing.cache_read}`);
     }
 
     return lines.join('\n');
   }
 
   /**
-   * 获取支持的模型列表
-   */
+   * 鑾峰彇鏀寔鐨勬ā鍨嬪垪琛?   */
   getSupportedModels(): string[] {
     return Object.keys(CLAUDE_PRICING);
   }
 
   /**
-   * 聚合多个token使用数据
+   * 鑱氬悎澶氫釜token浣跨敤鏁版嵁
    */
   aggregateUsage(usages: TokenUsage[]): TokenUsage {
     return usages.reduce(
@@ -873,7 +894,7 @@ export class TokenCounterService {
   }
 
   /**
-   * 检查API是否可用
+   * 妫€鏌PI鏄惁鍙敤
    */
   isApiAvailable(): boolean {
     return this.client !== null;
@@ -897,10 +918,10 @@ export interface SessionTokenStats {
   };
 }
 
-// 导出单例实例
+// 瀵煎嚭鍗曚緥瀹炰緥
 export const tokenCounter = new TokenCounterService();
 
-// 便利函数导出
+// 渚垮埄鍑芥暟瀵煎嚭
 export const countTokens = (messages: ClaudeMessage[], model?: string, tools?: ClaudeTool[], systemPrompt?: string) =>
   tokenCounter.countTokens(messages, model, tools, systemPrompt);
 
@@ -908,16 +929,14 @@ export const calculateCost = (usage: TokenUsage, model?: string) =>
   tokenCounter.calculateCost(usage, model);
 
 /**
- * 向后兼容的函数保留
- * Normalize usage data from different API response formats
+ * 鍚戝悗鍏煎鐨勫嚱鏁颁繚鐣? * Normalize usage data from different API response formats
  */
 export function normalizeTokenUsage(usage: any): TokenUsage {
   return tokenCounter.normalizeUsage(usage);
 }
 
 /**
- * 向后兼容的函数保留
- * Get model pricing configuration
+ * 鍚戝悗鍏煎鐨勫嚱鏁颁繚鐣? * Get model pricing configuration
  */
 export function getModelPricing(model?: string) {
   const normalizedModel = tokenCounter.normalizeModel(model);
@@ -1075,3 +1094,4 @@ export async function getSessionCacheTokens(sessionId: string): Promise<{ cache_
 }
 
 export default tokenCounter;
+

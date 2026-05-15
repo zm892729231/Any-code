@@ -34,7 +34,7 @@ export const initialState: InputState = {
   executionEngineConfig: {
     engine: "claude",
     codexMode: "read-only",
-    codexModel: "gpt-5.3-codex",
+    codexModel: "gpt-5.5",
     geminiModel: "gemini-3-flash",
   },
   enableProjectContext: false,
