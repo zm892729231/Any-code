@@ -15,9 +15,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const { checkUpdate } = useUpdate();
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [showAboutDialog, setShowAboutDialog] = useState(false);
+  const isDev = import.meta.env.DEV;
 
   const handleCheckUpdate = async () => {
     setShowAboutDialog(false);
+
+    if (isDev) {
+      await message('开发模式下已跳过更新检查', { title: '更新检查', kind: 'info' });
+      return;
+    }
     
     // 强制检查更新
     const hasUpdate = await checkUpdate(true);

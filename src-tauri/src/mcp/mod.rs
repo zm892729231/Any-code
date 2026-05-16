@@ -24,7 +24,7 @@ mod validation;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 // 重新导出公共 API
 pub use claude::{
@@ -39,7 +39,7 @@ pub use gemini::{
     import_from_gemini, remove_server_from_gemini, sync_servers_to_gemini,
     sync_single_server_to_gemini,
 };
-pub use validation::{extract_server_spec, validate_server_spec};
+pub use validation::validate_server_spec;
 
 /// 应用类型
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

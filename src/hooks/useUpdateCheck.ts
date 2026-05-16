@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import type { CheckResult } from "../lib/updater";
 import { checkForUpdate, getCurrentVersion } from "../lib/updater";
 
@@ -14,6 +14,7 @@ export function useUpdateCheck(): UseUpdateCheckResult {
   const [error, setError] = useState<string | null>(null);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const isCheckingRef = useRef(false);
+  const isDev = import.meta.env.DEV;
 
   const checkUpdate = useCallback(async (force: boolean = false): Promise<CheckResult> => {
     // 如果正在检查，直接返回错误或等待（此处选择直接返回以避免重复调用）
@@ -53,6 +54,18 @@ export function useUpdateCheck(): UseUpdateCheckResult {
       isCheckingRef.current = false;
     }
   }, [lastChecked]);
+
+  useEffect(() => {
+    if (isDev) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      checkUpdate(false).catch(console.error);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [checkUpdate, isDev]);
 
   return {
     isChecking,

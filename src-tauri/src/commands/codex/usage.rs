@@ -7,7 +7,7 @@
  * - Model-level statistics
  * - Per-project statistics
  */
-use chrono::{DateTime, Local, NaiveDate};
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
@@ -552,8 +552,8 @@ pub async fn get_codex_usage_stats(
         all_sessions
             .into_iter()
             .filter(|s| {
-                let session_date = chrono::NaiveDateTime::from_timestamp_opt(s.created_at as i64, 0)
-                    .map(|dt| dt.date());
+                let session_date = chrono::DateTime::from_timestamp(s.created_at as i64, 0)
+                    .map(|dt| dt.date_naive());
                 if let Some(date) = session_date {
                     date >= start_naive && date <= end_naive
                 } else {
@@ -602,7 +602,7 @@ pub async fn get_codex_usage_stats(
         model_stat.session_count += 1;
 
         // Update daily stats
-        let date = chrono::NaiveDateTime::from_timestamp_opt(session.created_at as i64, 0)
+        let date = chrono::DateTime::from_timestamp(session.created_at as i64, 0)
             .map(|dt| dt.format("%Y-%m-%d").to_string())
             .unwrap_or_else(|| "unknown".to_string());
 
@@ -626,7 +626,7 @@ pub async fn get_codex_usage_stats(
             .unwrap_or(&session.project_path)
             .to_string();
 
-        let last_used = chrono::NaiveDateTime::from_timestamp_opt(session.updated_at as i64, 0)
+        let last_used = chrono::DateTime::from_timestamp(session.updated_at as i64, 0)
             .map(|dt| dt.format("%Y-%m-%dT%H:%M:%S").to_string())
             .unwrap_or_else(|| "unknown".to_string());
 

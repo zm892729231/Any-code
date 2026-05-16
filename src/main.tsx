@@ -53,7 +53,9 @@ const AppWrapper: React.FC = () => {
   // 🆕 根据窗口类型渲染不同的组件
   if (isDetachedWindow) {
     return (
-      <ErrorBoundary>
+      <ErrorBoundary onError={(error, errorInfo) => {
+        console.error('[DetachedWindow] Render error:', error, errorInfo);
+      }}>
         <ThemeProvider>
           <React.Suspense
             fallback={
@@ -70,7 +72,9 @@ const AppWrapper: React.FC = () => {
   }
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundary onError={(error, errorInfo) => {
+      console.error('[App] Render error:', error, errorInfo);
+    }}>
       <ThemeProvider>
         <App />
       </ThemeProvider>

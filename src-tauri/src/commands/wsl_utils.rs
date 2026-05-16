@@ -813,7 +813,7 @@ pub fn check_wsl_codex(distro: Option<&str>) -> Option<String> {
             Ok(output) => {
                 let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
                 let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                warn!(
+                debug!(
                     "[WSL] Codex candidate '{}' is not runnable (exit={:?}), stdout='{}', stderr='{}'",
                     program,
                     output.status.code(),
@@ -823,7 +823,7 @@ pub fn check_wsl_codex(distro: Option<&str>) -> Option<String> {
                 false
             }
             Err(e) => {
-                warn!(
+                debug!(
                     "[WSL] Failed to verify Codex candidate '{}' execution: {}",
                     program, e
                 );
@@ -1382,7 +1382,7 @@ pub fn check_wsl_claude(distro: Option<&str>) -> Option<String> {
             Ok(output) => {
                 let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
                 let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                warn!(
+                debug!(
                     "[Claude WSL] Claude candidate '{}' is not runnable (exit={:?}), stdout='{}', stderr='{}'",
                     program,
                     output.status.code(),
@@ -1392,7 +1392,7 @@ pub fn check_wsl_claude(distro: Option<&str>) -> Option<String> {
                 false
             }
             Err(e) => {
-                warn!(
+                debug!(
                     "[Claude WSL] Failed to verify Claude candidate '{}' execution: {}",
                     program, e
                 );

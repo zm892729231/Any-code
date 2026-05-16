@@ -72,6 +72,7 @@ nul
 *.deb
 *.rpm
 *.appimage
+artifacts-local/
 
 # Test and coverage
 coverage/
