@@ -64,7 +64,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       {/* Main Content Area */}
       <main className="flex-1 relative flex flex-col min-w-0 overflow-hidden z-10">
         {/* Content */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-none [overscroll-behavior-y:none] scroll-smooth">
           {children}
         </div>
       </main>
