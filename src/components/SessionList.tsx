@@ -321,6 +321,7 @@ export const SessionList: React.FC<SessionListProps> = ({
 
   return (
     <div className={cn("space-y-4", className)}>
+      <div className="sticky top-6 z-20 -mx-1 space-y-4 rounded-[1.75rem] border border-border/40 bg-background/90 px-1 py-1 shadow-[0_22px_50px_-30px_rgba(0,0,0,0.75)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/75">
       {/* 🎯 重构后的布局：项目信息 + Edit CLAUDE.md 按钮在同一行 */}
       <div className="flex items-center justify-between gap-4">
         {/* 左侧：返回按钮 + 项目信息 */}
@@ -408,7 +409,7 @@ export const SessionList: React.FC<SessionListProps> = ({
       </Tabs>
 
       {/* 🎯 新布局：批量管理会话 + 新建会话按钮在同一行 */}
-      <div className="flex items-center justify-between gap-3 p-3 bg-muted/30 rounded-lg border border-border">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-muted/30 p-3">
         {/* 左侧：批量管理会话 */}
         <div className="flex items-center gap-2 flex-1">
           {onSessionsBatchDelete && validSessions.length > 0 && (
@@ -482,6 +483,8 @@ export const SessionList: React.FC<SessionListProps> = ({
             </Button>
           )}
         </div>
+      </div>
+
       </div>
 
       {/* Compact session list */}
