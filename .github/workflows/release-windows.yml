@@ -16,17 +16,16 @@ permissions:
 jobs:
   release-windows:
     name: Build and Release Windows
+    if: ${{ !contains(github.ref_name, '-macos') }}
     runs-on: windows-latest
 
     steps:
       - name: Checkout repository
-        if: ${{ !endsWith(github.ref_name, '-macos') }}
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Resolve version
-        if: ${{ !endsWith(github.ref_name, '-macos') }}
         id: version
         shell: pwsh
         run: |
@@ -45,26 +44,22 @@ jobs:
           "tag=v$version" >> $env:GITHUB_OUTPUT
 
       - name: Setup Rust
-        if: ${{ !endsWith(github.ref_name, '-macos') }}
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
 
       - name: Rust cache
-        if: ${{ !endsWith(github.ref_name, '-macos') }}
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
           key: windows-x86_64-pc-windows-msvc-rust-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Setup Bun
-        if: ${{ !endsWith(github.ref_name, '-macos') }}
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
       - name: Cache Bun dependencies
-        if: ${{ !endsWith(github.ref_name, '-macos') }}
         uses: actions/cache@v4
         with:
           path: |
@@ -75,22 +70,18 @@ jobs:
             windows-bun-
 
       - name: Install frontend dependencies
-        if: ${{ !endsWith(github.ref_name, '-macos') }}
         run: bun install
 
       - name: Build frontend
-        if: ${{ !endsWith(github.ref_name, '-macos') }}
         run: bun run build
 
       - name: Build Tauri Windows bundles
-        if: ${{ !endsWith(github.ref_name, '-macos') }}
         run: bun run tauri build
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: Create portable executable
-        if: ${{ !endsWith(github.ref_name, '-macos') }}
         shell: pwsh
         run: |
           $version = "${{ steps.version.outputs.version }}"
@@ -106,7 +97,6 @@ jobs:
           Copy-Item $exePath $portablePath -Force
 
       - name: Normalize asset names
-        if: ${{ !endsWith(github.ref_name, '-macos') }}
         shell: pwsh
         run: |
           $version = "${{ steps.version.outputs.version }}"
@@ -133,7 +123,6 @@ jobs:
           }
 
       - name: Generate latest.json
-        if: ${{ !endsWith(github.ref_name, '-macos') }}
         shell: pwsh
         run: |
           $version = "${{ steps.version.outputs.version }}"
@@ -165,7 +154,6 @@ jobs:
           $latest | ConvertTo-Json -Depth 10 | Set-Content -Path latest.json -Encoding utf8
 
       - name: Upload build artifact
-        if: ${{ !endsWith(github.ref_name, '-macos') }}
         uses: actions/upload-artifact@v4
         with:
           name: windows-release-${{ steps.version.outputs.version }}
@@ -178,7 +166,6 @@ jobs:
           retention-days: 7
 
       - name: Publish GitHub Release
-        if: ${{ !endsWith(github.ref_name, '-macos') }}
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.version.outputs.tag }}
