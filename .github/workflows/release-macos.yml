@@ -7,6 +7,9 @@ on:
         description: "Release tag, e.g. v5.28.5. Empty uses package.json version."
         required: false
         type: string
+  push:
+    tags:
+      - "v*-macos"
 
 env:
   CARGO_TERM_COLOR: always
@@ -42,7 +45,11 @@ jobs:
         shell: bash
         run: |
           input_tag="${{ inputs.tag }}"
-          if [ -n "$input_tag" ]; then
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            raw_tag="${{ github.ref_name }}"
+            version="${raw_tag#v}"
+            version="${version%-macos}"
+          elif [ -n "$input_tag" ]; then
             tag="${input_tag#v}"
             version="$tag"
           else
@@ -187,7 +194,11 @@ jobs:
         shell: bash
         run: |
           input_tag="${{ inputs.tag }}"
-          if [ -n "$input_tag" ]; then
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            raw_tag="${{ github.ref_name }}"
+            version="${raw_tag#v}"
+            version="${version%-macos}"
+          elif [ -n "$input_tag" ]; then
             tag="${input_tag#v}"
             version="$tag"
           else
