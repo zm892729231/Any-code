@@ -1,0 +1,289 @@
+name: Release macOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, e.g. v5.28.5. Empty uses package.json version."
+        required: false
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    name: Build macOS ${{ matrix.asset-arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - asset-arch: aarch64
+            os: macos-15
+            rust-target: aarch64-apple-darwin
+          - asset-arch: x64
+            os: macos-15-intel
+            rust-target: x86_64-apple-darwin
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          input_tag="${{ inputs.tag }}"
+          if [ -n "$input_tag" ]; then
+            tag="${input_tag#v}"
+            version="$tag"
+          else
+            version="$(node -p "require('./package.json').version")"
+          fi
+
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid version: $version"
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+          key: macos-${{ matrix.rust-target }}-rust-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun
+            node_modules
+          key: macos-${{ matrix.rust-target }}-bun-${{ hashFiles('bun.lock', 'package-lock.json', 'package.json') }}
+          restore-keys: |
+            macos-${{ matrix.rust-target }}-bun-
+
+      - name: Install frontend dependencies
+        run: bun install
+
+      - name: Build frontend
+        run: bun run build
+
+      - name: Configure macOS signing identity
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$APPLE_CERTIFICATE$APPLE_CERTIFICATE_PASSWORD$KEYCHAIN_PASSWORD" ]; then
+            if [ -z "$APPLE_CERTIFICATE" ] || [ -z "$APPLE_CERTIFICATE_PASSWORD" ] || [ -z "$KEYCHAIN_PASSWORD" ]; then
+              echo "::error::APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, and KEYCHAIN_PASSWORD must be configured together."
+              exit 1
+            fi
+            if [ -z "$APPLE_ID" ] || [ -z "$APPLE_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
+              echo "::error::APPLE_ID, APPLE_PASSWORD, and APPLE_TEAM_ID are required for notarized macOS releases."
+              exit 1
+            fi
+
+            echo "$APPLE_CERTIFICATE" | base64 -D > certificate.p12
+            security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+            security default-keychain -s build.keychain
+            security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+            security set-keychain-settings -t 3600 -u build.keychain
+            security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+            cert_id="$(security find-identity -v -p codesigning build.keychain | awk -F '"' '/Developer ID Application/ {print $2; exit}')"
+            if [ -z "$cert_id" ]; then
+              echo "::error::No valid Developer ID Application code signing identity found."
+              exit 1
+            fi
+
+            echo "APPLE_SIGNING_IDENTITY=$cert_id" >> "$GITHUB_ENV"
+          else
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+            echo "::notice::Apple certificate secrets are not configured. Using ad-hoc signing."
+          fi
+
+      - name: Build Tauri macOS bundle
+        run: bun run tauri build --target ${{ matrix.rust-target }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Normalize asset names
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          asset_arch="${{ matrix.asset-arch }}"
+          bundle_dir="src-tauri/target/${{ matrix.rust-target }}/release/bundle"
+
+          dmg_path="$(find "$bundle_dir" -name "*.dmg" -type f -print -quit)"
+          tar_path="$(find "$bundle_dir" -name "*.app.tar.gz" ! -name "*.sig" -type f -print -quit)"
+          sig_path="$(find "$bundle_dir" -name "*.app.tar.gz.sig" -type f -print -quit)"
+
+          if [ -z "$dmg_path" ]; then
+            echo "::error::Missing macOS DMG artifact."
+            exit 1
+          fi
+
+          if [ -z "$tar_path" ] || [ -z "$sig_path" ]; then
+            echo "::error::Missing macOS updater archive or signature."
+            exit 1
+          fi
+
+          mv "$dmg_path" "$(dirname "$dmg_path")/any-code_${version}_${asset_arch}.dmg"
+          mv "$tar_path" "$(dirname "$tar_path")/any-code_${version}_${asset_arch}.app.tar.gz"
+          mv "$sig_path" "$(dirname "$sig_path")/any-code_${version}_${asset_arch}.app.tar.gz.sig"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.asset-arch }}-${{ steps.version.outputs.version }}
+          path: |
+            src-tauri/target/${{ matrix.rust-target }}/release/bundle/**/*.dmg
+            src-tauri/target/${{ matrix.rust-target }}/release/bundle/**/*.app.tar.gz
+            src-tauri/target/${{ matrix.rust-target }}/release/bundle/**/*.app.tar.gz.sig
+          retention-days: 7
+
+  publish-macos:
+    name: Publish macOS Release Assets
+    needs: build-macos
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          input_tag="${{ inputs.tag }}"
+          if [ -n "$input_tag" ]; then
+            tag="${input_tag#v}"
+            version="$tag"
+          else
+            version="$(node -p "require('./package.json').version")"
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: macos-*
+          merge-multiple: true
+
+      - name: Download existing latest.json
+        continue-on-error: true
+        run: |
+          curl -fL "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/latest.json" -o latest-existing.json
+
+      - name: Merge updater manifest
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          python3 - <<'PY'
+          import glob
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          version = os.environ["VERSION"]
+          tag = os.environ["TAG"]
+          repo = os.environ["GITHUB_REPOSITORY"]
+
+          if os.path.exists("latest-existing.json"):
+            with open("latest-existing.json", "r", encoding="utf-8-sig") as f:
+              data = json.load(f)
+          else:
+            data = {"platforms": {}}
+
+          data["version"] = version
+          data["pub_date"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+          data["notes"] = f"See the full changelog at https://github.com/{repo}/releases/tag/{tag}"
+          data.setdefault("platforms", {})
+
+          entries = {
+            "darwin-aarch64": ("*_aarch64.app.tar.gz.sig", f"any-code_{version}_aarch64.app.tar.gz"),
+            "darwin-x86_64": ("*_x64.app.tar.gz.sig", f"any-code_{version}_x64.app.tar.gz"),
+          }
+
+          for platform, (sig_pattern, asset_name) in entries.items():
+            matches = glob.glob(f"artifacts/**/{sig_pattern}", recursive=True)
+            if not matches:
+              raise SystemExit(f"Missing signature for {platform}: {sig_pattern}")
+            with open(matches[0], "r", encoding="utf-8") as f:
+              signature = f.read().strip()
+            if not signature:
+              raise SystemExit(f"Empty signature for {platform}")
+
+            data["platforms"][platform] = {
+              "signature": signature,
+              "url": f"https://github.com/{repo}/releases/download/{tag}/{asset_name}",
+            }
+
+          with open("latest.json", "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+          PY
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+          version="${{ steps.version.outputs.version }}"
+
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" \
+              --title "Any Code $tag" \
+              --notes "macOS build artifacts for Any Code $tag."
+          fi
+
+          mapfile -t files < <(find artifacts -type f \( \
+            -name "*.dmg" -o \
+            -name "*.app.tar.gz" -o \
+            -name "*.app.tar.gz.sig" \
+          \) -print)
+          files+=("latest.json")
+
+          if [ "${#files[@]}" -eq 1 ]; then
+            echo "::error::No macOS release artifacts found."
+            exit 1
+          fi
+
+          gh release upload "$tag" "${files[@]}" --clobber
