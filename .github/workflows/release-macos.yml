@@ -49,6 +49,7 @@ jobs:
             raw_tag="${{ github.ref_name }}"
             version="${raw_tag#v}"
             version="${version%-macos}"
+            version="${version%%-macos.*}"
           elif [ -n "$input_tag" ]; then
             tag="${input_tag#v}"
             version="$tag"
@@ -132,7 +133,6 @@ jobs:
 
             echo "APPLE_SIGNING_IDENTITY=$cert_id" >> "$GITHUB_ENV"
           else
-            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
             echo "::notice::Apple certificate secrets are not configured. Using ad-hoc signing."
           fi
 
@@ -180,6 +180,16 @@ jobs:
             src-tauri/target/${{ matrix.rust-target }}/release/bundle/**/*.app.tar.gz.sig
           retention-days: 7
 
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build-logs-${{ matrix.asset-arch }}-${{ steps.version.outputs.version }}
+          path: |
+            src-tauri/target/${{ matrix.rust-target }}/release/build/*/output
+            src-tauri/target/release/build/*/output
+          retention-days: 7
+
   publish-macos:
     name: Publish macOS Release Assets
     needs: build-macos
@@ -198,6 +208,7 @@ jobs:
             raw_tag="${{ github.ref_name }}"
             version="${raw_tag#v}"
             version="${version%-macos}"
+            version="${version%%-macos.*}"
           elif [ -n "$input_tag" ]; then
             tag="${input_tag#v}"
             version="$tag"
