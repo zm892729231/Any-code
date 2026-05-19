@@ -1217,7 +1217,10 @@ export function usePromptExecution(config: UsePromptExecutionConfig): UsePromptE
           // Mark prompt as completed (record Git state after completion)
           if (recordedPromptIndex >= 0) {
             // Use currentSessionId and extractedSessionInfo for new sessions
-            const sessionId = effectiveSession?.id || currentSessionId;
+            // 优先使用本轮运行里最新拿到的 session_id。
+            // Claude 在 plan/continue/resume 场景下可能返回新的会话 ID，
+            // 如果这里继续使用旧的 effectiveSession.id，会导致记录写到旧会话里。
+            const sessionId = currentSessionId || effectiveSession?.id;
             const projectId = effectiveSession?.project_id || extractedSessionInfo?.projectId || projectPath.replace(/[^a-zA-Z0-9]/g, '-');
             
             if (sessionId && projectId) {
@@ -1338,9 +1341,11 @@ export function usePromptExecution(config: UsePromptExecutionConfig): UsePromptE
                 currentSessionId = msg.session_id;
                 setClaudeSessionId(msg.session_id);
 
-                // If we haven't extracted session info before, do it now
-                if (!extractedSessionInfo) {
-                  const projectId = projectPath.replace(/[^a-zA-Z0-9]/g, '-');
+                // Claude 在 plan/continue/resume 场景下可能切换到新的 session_id。
+                // 这里不能只在“首次为空”时写入，否则标签页和本地持久化会保留旧会话，
+                // 随后切换页面或重开应用时就会表现为“会话丢失”。
+                const projectId = extractedSessionInfo?.projectId || projectPath.replace(/[^a-zA-Z0-9]/g, '-');
+                if (!extractedSessionInfo || extractedSessionInfo.sessionId !== msg.session_id) {
                   setExtractedSessionInfo({ sessionId: msg.session_id, projectId, engine: 'claude' });
                 }
 
