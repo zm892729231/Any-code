@@ -58,8 +58,7 @@ fn registry_path() -> PathBuf {
 fn ensure_registry_dir() -> Result<(), String> {
     let path = registry_path();
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("创建注册表目录失败: {}", e))?;
+        fs::create_dir_all(parent).map_err(|e| format!("创建注册表目录失败: {}", e))?;
     }
     Ok(())
 }
@@ -72,15 +71,13 @@ pub fn read_registry() -> Result<McpRegistry, String> {
         return Ok(McpRegistry::default());
     }
 
-    let content = fs::read_to_string(&path)
-        .map_err(|e| format!("读取注册表失败: {}", e))?;
+    let content = fs::read_to_string(&path).map_err(|e| format!("读取注册表失败: {}", e))?;
 
     if content.trim().is_empty() {
         return Ok(McpRegistry::default());
     }
 
-    serde_json::from_str(&content)
-        .map_err(|e| format!("解析注册表失败: {}", e))
+    serde_json::from_str(&content).map_err(|e| format!("解析注册表失败: {}", e))
 }
 
 /// 写入注册表
@@ -88,11 +85,10 @@ pub fn write_registry(registry: &McpRegistry) -> Result<(), String> {
     ensure_registry_dir()?;
 
     let path = registry_path();
-    let content = serde_json::to_string_pretty(registry)
-        .map_err(|e| format!("序列化注册表失败: {}", e))?;
+    let content =
+        serde_json::to_string_pretty(registry).map_err(|e| format!("序列化注册表失败: {}", e))?;
 
-    fs::write(&path, content)
-        .map_err(|e| format!("写入注册表失败: {}", e))?;
+    fs::write(&path, content).map_err(|e| format!("写入注册表失败: {}", e))?;
 
     log::info!("注册表已保存到: {}", path.display());
     Ok(())
@@ -117,7 +113,10 @@ pub fn get_engine_servers_with_status(engine: &str) -> Result<Vec<(String, Value
         let is_enabled = enabled_servers.contains_key(id);
 
         // 使用引擎配置中的 spec（如果存在），否则使用注册表中的
-        let spec = enabled_servers.get(id).cloned().unwrap_or_else(|| entry.server.clone());
+        let spec = enabled_servers
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| entry.server.clone());
 
         result.push((id.clone(), spec, is_enabled));
         seen_ids.insert(id.clone());
@@ -137,12 +136,15 @@ pub fn get_engine_servers_with_status(engine: &str) -> Result<Vec<(String, Value
 pub fn upsert_server(id: &str, name: &str, server: &Value, enabled: bool) -> Result<(), String> {
     let mut registry = read_registry()?;
 
-    registry.servers.insert(id.to_string(), RegistryEntry {
-        id: id.to_string(),
-        name: name.to_string(),
-        server: server.clone(),
-        enabled,
-    });
+    registry.servers.insert(
+        id.to_string(),
+        RegistryEntry {
+            id: id.to_string(),
+            name: name.to_string(),
+            server: server.clone(),
+            enabled,
+        },
+    );
 
     write_registry(&registry)?;
     log::info!("服务器 '{}' 已添加到注册表", id);
@@ -188,7 +190,8 @@ pub fn sync_registry_to_engine(engine: &str) -> Result<(), String> {
     let app_type = super::AppType::from_str(engine)?;
 
     // 收集所有启用的服务器
-    let enabled_servers: HashMap<String, Value> = registry.servers
+    let enabled_servers: HashMap<String, Value> = registry
+        .servers
         .iter()
         .filter(|(_, entry)| entry.enabled)
         .map(|(id, entry)| (id.clone(), entry.server.clone()))
@@ -197,6 +200,10 @@ pub fn sync_registry_to_engine(engine: &str) -> Result<(), String> {
     // 同步到引擎配置
     super::sync_servers_to_app(&enabled_servers, &app_type)?;
 
-    log::info!("已将 {} 个启用的服务器同步到 {} 引擎", enabled_servers.len(), engine);
+    log::info!(
+        "已将 {} 个启用的服务器同步到 {} 引擎",
+        enabled_servers.len(),
+        engine
+    );
     Ok(())
 }

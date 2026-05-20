@@ -7,10 +7,10 @@ mod process;
 mod utils; // 新增：通用工具模块
 
 // MCP 多应用支持模块
-mod mcp;
 mod claude_mcp;
 mod codex_mcp;
 mod gemini_mcp;
+mod mcp;
 
 use claude_binary::init_shell_environment;
 
@@ -21,32 +21,84 @@ use commands::acemcp::{
     load_acemcp_config, preindex_project, save_acemcp_config, test_acemcp_availability,
 };
 use commands::claude::{
-    cancel_claude_execution, check_claude_version, clear_custom_claude_path, continue_claude_code,
-    delete_project, delete_project_permanently, delete_session, delete_sessions_batch,
-    execute_claude_code, find_claude_md_files, get_available_tools, get_claude_execution_config,
-    get_claude_path, get_claude_permission_config, get_claude_session_output, get_claude_settings,
-    get_codex_system_prompt, get_hooks_config, get_permission_presets, get_project_sessions,
-    get_system_prompt, list_directory_contents, list_hidden_projects, list_projects,
-    list_running_claude_sessions, load_session_history, open_new_session, read_claude_md_file,
-    reset_claude_execution_config, restore_project, resume_claude_code, save_claude_md_file,
-    save_claude_settings, save_codex_system_prompt, save_system_prompt, search_files,
-    set_custom_claude_path, update_claude_execution_config, update_claude_permission_config,
-    update_hooks_config, update_thinking_mode, validate_hook_command, validate_permission_config,
+    cancel_claude_execution,
+    check_claude_version,
+    clear_custom_claude_path,
+    continue_claude_code,
+    delete_project,
+    delete_project_permanently,
+    delete_session,
+    delete_sessions_batch,
+    execute_claude_code,
+    find_claude_md_files,
+    get_available_tools,
+    get_claude_execution_config,
+    get_claude_path,
+    get_claude_permission_config,
+    get_claude_session_output,
+    get_claude_settings,
     // Claude WSL mode configuration
-    get_claude_wsl_mode_config, set_claude_wsl_mode_config,
+    get_claude_wsl_mode_config,
+    get_codex_system_prompt,
+    get_hooks_config,
+    get_permission_presets,
+    get_project_sessions,
+    get_system_prompt,
+    list_directory_contents,
+    list_hidden_projects,
+    list_projects,
+    list_running_claude_sessions,
+    load_session_history,
+    open_new_session,
+    read_claude_md_file,
+    reset_claude_execution_config,
+    restore_project,
+    resume_claude_code,
+    save_claude_md_file,
+    save_claude_settings,
+    save_codex_system_prompt,
+    save_system_prompt,
+    search_files,
+    set_claude_wsl_mode_config,
+    set_custom_claude_path,
+    update_claude_execution_config,
+    update_claude_permission_config,
+    update_hooks_config,
+    update_thinking_mode,
+    validate_hook_command,
+    validate_permission_config,
     ClaudeProcessState,
 };
 use commands::mcp::{
-    mcp_add, mcp_add_from_claude_desktop, mcp_add_json, mcp_export_config, mcp_get,
-    mcp_get_server_status, mcp_list, mcp_read_project_config, mcp_remove,
-    mcp_reset_project_choices, mcp_save_project_config, mcp_serve, mcp_test_connection,
+    mcp_add,
+    mcp_add_from_claude_desktop,
+    mcp_add_json,
+    mcp_delete_engine_server,
+    mcp_delete_server,
+    mcp_export_config,
+    mcp_get,
+    mcp_get_all_servers,
     // 多应用 MCP 支持（新增）
-    mcp_get_claude_status, mcp_upsert_server, mcp_delete_server, mcp_toggle_app,
-    mcp_import_from_app, mcp_validate_command, mcp_read_claude_config, mcp_get_all_servers,
-    mcp_get_unified_servers,
+    mcp_get_claude_status,
     // 多引擎独立隔离控制 API（新设计）
-    mcp_get_engine_servers, mcp_upsert_engine_server, mcp_delete_engine_server,
-    mcp_toggle_engine_server, mcp_get_engine_servers_with_status,
+    mcp_get_engine_servers,
+    mcp_get_engine_servers_with_status,
+    mcp_get_server_status,
+    mcp_get_unified_servers,
+    mcp_import_from_app,
+    mcp_list,
+    mcp_read_claude_config,
+    mcp_read_project_config,
+    mcp_remove,
+    mcp_reset_project_choices,
+    mcp_save_project_config,
+    mcp_serve,
+    mcp_test_connection,
+    mcp_toggle_app,
+    mcp_toggle_engine_server,
+    mcp_upsert_engine_server,
+    mcp_upsert_server,
+    mcp_validate_command,
 };
 use commands::storage::{init_database, AgentDb};
 
@@ -58,7 +110,8 @@ use commands::prompt_tracker::{
 use commands::provider::{
     add_provider_config, clear_provider_config, delete_provider_config,
     get_current_provider_config, get_provider_config, get_provider_presets, query_provider_usage,
-    reorder_provider_configs, switch_provider_config, test_provider_connection, update_provider_config,
+    reorder_provider_configs, switch_provider_config, test_provider_connection,
+    update_provider_config,
 };
 use commands::simple_git::{check_and_init_git, check_reset_safety, precise_revert_code};
 use commands::storage::{
@@ -93,6 +146,7 @@ use commands::codex::{
     execute_codex,
     // Codex mode configuration
     get_codex_mode_config,
+    get_codex_multi_agent_config,
     get_codex_path,
     get_codex_prompt_list,
     // Codex provider management
@@ -110,13 +164,12 @@ use commands::codex::{
     resume_last_codex,
     revert_codex_to_prompt,
     set_codex_mode_config,
+    set_codex_multi_agent_config,
     set_custom_codex_path,
     switch_codex_provider,
     test_codex_provider_connection,
     update_codex_provider_config,
     update_codex_reasoning_level,
-    get_codex_multi_agent_config,
-    set_codex_multi_agent_config,
     validate_codex_path_cmd,
     CodexProcessState,
 };

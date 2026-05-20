@@ -41,7 +41,12 @@ impl ProjectStore {
 
             // Count total valid project directories first
             let total_project_count = fs::read_dir(&projects_dir)
-                .map(|entries| entries.filter_map(|e| e.ok()).filter(|e| e.path().is_dir()).count())
+                .map(|entries| {
+                    entries
+                        .filter_map(|e| e.ok())
+                        .filter(|e| e.path().is_dir())
+                        .count()
+                })
                 .unwrap_or(0);
 
             // Safety check: if hidden_projects would hide ALL projects, clear the hidden list
@@ -196,6 +201,10 @@ impl ProjectStore {
                         .as_secs();
 
                     let (first_message_raw, message_timestamp) = extract_first_user_message(&path);
+                    if first_message_raw.is_none() {
+                        log::debug!("Skipping non-displayable utility session: {}", session_id);
+                        continue;
+                    }
                     let last_message_timestamp = extract_last_message_timestamp(&path);
                     let model = extract_session_model(&path);
 
@@ -206,10 +215,7 @@ impl ProjectStore {
                         // 1. 有 last_message_timestamp，说明有消息
                         // 2. 文件大小 > 100 字节（排除几乎空的会话文件）
                         let has_content = last_message_timestamp.is_some()
-                            && path.metadata()
-                                .ok()
-                                .map(|m| m.len() > 100)
-                                .unwrap_or(false);
+                            && path.metadata().ok().map(|m| m.len() > 100).unwrap_or(false);
 
                         if has_content {
                             // 只显示 session_id 的前8位，避免 UI 过长

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import { ClaudeCodeSession } from './ClaudeCodeSession';
 import { useTabSession } from '@/hooks/useTabs';
 import type { Session } from '@/lib/api';
@@ -40,6 +40,11 @@ const TabSessionWrapperComponent: React.FC<TabSessionWrapperProps> = ({
   //   (the component manages its own session through extractedSessionInfo)
   // - If the initial session was defined (existing session), pass the current session prop
   const effectiveSessionForChild = initialSessionRef.current === undefined ? undefined : session;
+  const planModeStorageKey = useMemo(() => {
+    if (session?.id) return `plan-mode:session:${session.id}`;
+    if (initialProjectPath) return `plan-mode:path:${initialProjectPath.replace(/\\/g, '/').toLowerCase()}`;
+    return `plan-mode:tab:${tabId}`;
+  }, [session?.id, initialProjectPath, tabId]);
 
   // 🔧 NEW: Register cleanup callback for proper resource management
   useEffect(() => {
@@ -129,6 +134,7 @@ const TabSessionWrapperComponent: React.FC<TabSessionWrapperProps> = ({
         onEngineChange={handleEngineChange}
         onSessionInfoChange={handleSessionInfoChange}
         isActive={isActive}
+        planModeStorageKey={planModeStorageKey}
       />
     </div>
   );

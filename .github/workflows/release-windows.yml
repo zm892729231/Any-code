@@ -2,9 +2,6 @@ name: Release Windows
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*"
 
 env:
   CARGO_TERM_COLOR: always
@@ -122,6 +119,18 @@ jobs:
             Rename-Item -LiteralPath $msiSig.FullName -NewName "any-code_${version}_x64.msi.sig" -Force
           }
 
+      - name: Download existing latest.json
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.version.outputs.tag }}"
+          $url = "https://github.com/${{ github.repository }}/releases/download/$tag/latest.json"
+          try {
+            Invoke-WebRequest -Uri $url -OutFile latest-existing.json
+          } catch {
+            Write-Host "No existing latest.json found for $tag, continuing with Windows-only manifest."
+          }
+
       - name: Generate latest.json
         shell: pwsh
         run: |
@@ -134,24 +143,21 @@ jobs:
             throw "Missing Windows updater signature. Set TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD secrets."
           }
 
-          $signature = (Get-Content -LiteralPath $setupSig.FullName -Raw).Trim()
-          if (-not $signature) {
-            throw "Windows updater signature is empty."
-          }
+          python .github/scripts/merge_latest_json.py `
+            --version $version `
+            --tag $tag `
+            --repo "${{ github.repository }}" `
+            --output latest.json `
+            --existing latest-existing.json `
+            --platform "windows-x86_64|$($setupSig.FullName)|any-code_${version}_x64-setup.exe"
 
-          $latest = [ordered]@{
-            version = $version
-            pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-            notes = "See the full changelog at https://github.com/${{ github.repository }}/releases/tag/$tag"
-            platforms = [ordered]@{
-              "windows-x86_64" = [ordered]@{
-                signature = $signature
-                url = "https://github.com/${{ github.repository }}/releases/download/$tag/any-code_${version}_x64-setup.exe"
-              }
-            }
-          }
-
-          $latest | ConvertTo-Json -Depth 10 | Set-Content -Path latest.json -Encoding utf8
+      - name: Prepare release notes
+        shell: pwsh
+        run: |
+          python .github/scripts/generate_release_notes.py `
+            --version "${{ steps.version.outputs.version }}" `
+            --tag "${{ steps.version.outputs.tag }}" `
+            --output release-notes.md
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -166,26 +172,25 @@ jobs:
           retention-days: 7
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: Any Code ${{ steps.version.outputs.tag }}
-          draft: false
-          prerelease: false
-          fail_on_unmatched_files: false
-          files: |
-            src-tauri/target/release/bundle/**/*.exe
-            src-tauri/target/release/bundle/**/*.exe.sig
-            src-tauri/target/release/bundle/**/*.msi
-            src-tauri/target/release/bundle/**/*.msi.sig
-            latest.json
-          body: |
-            ## Any Code ${{ steps.version.outputs.tag }}
-
-            Windows build artifacts:
-
-            - `any-code_${{ steps.version.outputs.version }}_x64-setup.exe`: installer build with updater support
-            - `any-code_${{ steps.version.outputs.version }}_x64-portable.exe`: portable build, manual updates required
-            - `latest.json`: Tauri updater manifest
+        shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ steps.version.outputs.tag }}"
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release edit $tag --title "Any Code $tag" --notes-file release-notes.md
+          } else {
+            gh release create $tag --title "Any Code $tag" --notes-file release-notes.md
+            if ($LASTEXITCODE -ne 0) {
+              gh release edit $tag --title "Any Code $tag" --notes-file release-notes.md
+            }
+          }
+
+          $files = Get-ChildItem src-tauri/target/release/bundle -Recurse -File |
+            Where-Object { $_.Extension -in '.exe', '.sig', '.msi' } |
+            ForEach-Object { $_.FullName }
+          $files += (Resolve-Path latest.json).Path
+
+          gh release upload $tag $files --clobber

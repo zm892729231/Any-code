@@ -314,7 +314,12 @@ pub async fn check_codex_rewind_capabilities(
         .find(|r| r.prompt_index == prompt_index);
 
     if let Some(record) = git_record {
-        let has_valid_commit = !record.commit_before.is_empty();
+        let has_valid_commit = !record.commit_before.is_empty()
+            && record
+                .commit_after
+                .as_ref()
+                .map(|commit_after| commit_after != &record.commit_before)
+                .unwrap_or(false);
         Ok(RewindCapabilities {
             conversation: true,
             code: has_valid_commit,
@@ -581,24 +586,31 @@ pub async fn record_codex_prompt_completed(
         return Ok(());
     }
 
-    // Auto-commit any changes made by AI
-    let commit_message = build_prompt_commit_message("[Codex]", prompt_text.as_deref(), prompt_index);
-    match simple_git::git_commit_changes(&project_path, &commit_message) {
-        Ok(true) => {
-            log::info!(
-                "[Codex Record] Auto-committed changes after prompt #{}",
-                prompt_index
-            );
-        }
-        Ok(false) => {
-            log::debug!(
-                "[Codex Record] No changes to commit after prompt #{}",
-                prompt_index
-            );
-        }
-        Err(e) => {
-            log::warn!("[Codex Record] Failed to auto-commit: {}", e);
-            // Continue anyway
+    if execution_config.disable_prompt_auto_commit {
+        log::info!(
+            "[Codex Record] Prompt auto-commit disabled, keeping working tree without Git commit"
+        );
+    } else {
+        // Auto-commit any changes made by AI
+        let commit_message =
+            build_prompt_commit_message("[Codex]", prompt_text.as_deref(), prompt_index);
+        match simple_git::git_commit_changes(&project_path, &commit_message) {
+            Ok(true) => {
+                log::info!(
+                    "[Codex Record] Auto-committed changes after prompt #{}",
+                    prompt_index
+                );
+            }
+            Ok(false) => {
+                log::debug!(
+                    "[Codex Record] No changes to commit after prompt #{}",
+                    prompt_index
+                );
+            }
+            Err(e) => {
+                log::warn!("[Codex Record] Failed to auto-commit: {}", e);
+                // Continue anyway
+            }
         }
     }
 
@@ -713,7 +725,10 @@ pub async fn revert_codex_to_prompt(
         }
 
         RewindMode::CodeOnly => {
-            log::info!("[Codex Rewind] Reverting code to state before prompt #{}", prompt_index);
+            log::info!(
+                "[Codex Rewind] Reverting code to state before prompt #{}",
+                prompt_index
+            );
 
             // Stash uncommitted changes
             simple_git::git_stash_save(
@@ -763,7 +778,10 @@ pub async fn revert_codex_to_prompt(
                 let commit_after = match &record.commit_after {
                     Some(c) if c != &record.commit_before => c.clone(),
                     _ => {
-                        log::debug!("[Codex Precise Revert] Skipping prompt #{} - no code changes", record.prompt_index);
+                        log::debug!(
+                            "[Codex Precise Revert] Skipping prompt #{} - no code changes",
+                            record.prompt_index
+                        );
                         continue;
                     }
                 };
@@ -805,7 +823,10 @@ pub async fn revert_codex_to_prompt(
                     &project_path,
                     &record.commit_before,
                     &commit_after,
-                    &format!("[Codex Revert] 撤回提示词 #{} 的代码更改", record.prompt_index),
+                    &format!(
+                        "[Codex Revert] 撤回提示词 #{} 的代码更改",
+                        record.prompt_index
+                    ),
                     3, // Max 3 retries for Git lock conflicts
                 );
 
@@ -829,7 +850,11 @@ pub async fn revert_codex_to_prompt(
                         break;
                     }
                     Err(e) => {
-                        log::warn!("[Codex Precise Revert] Revert failed for prompt #{}: {}", record.prompt_index, e);
+                        log::warn!(
+                            "[Codex Precise Revert] Revert failed for prompt #{}: {}",
+                            record.prompt_index,
+                            e
+                        );
                         revert_failed = true;
                         failure_message = e;
                         break;
@@ -861,7 +886,10 @@ pub async fn revert_codex_to_prompt(
         }
 
         RewindMode::Both => {
-            log::info!("[Codex Rewind] Reverting both to state before prompt #{}", prompt_index);
+            log::info!(
+                "[Codex Rewind] Reverting both to state before prompt #{}",
+                prompt_index
+            );
 
             // Stash uncommitted changes
             simple_git::git_stash_save(
@@ -911,7 +939,10 @@ pub async fn revert_codex_to_prompt(
                 let commit_after = match &record.commit_after {
                     Some(c) if c != &record.commit_before => c.clone(),
                     _ => {
-                        log::debug!("[Codex Precise Revert] Skipping prompt #{} - no code changes", record.prompt_index);
+                        log::debug!(
+                            "[Codex Precise Revert] Skipping prompt #{} - no code changes",
+                            record.prompt_index
+                        );
                         continue;
                     }
                 };
@@ -953,7 +984,10 @@ pub async fn revert_codex_to_prompt(
                     &project_path,
                     &record.commit_before,
                     &commit_after,
-                    &format!("[Codex Revert] 撤回提示词 #{} 的代码更改", record.prompt_index),
+                    &format!(
+                        "[Codex Revert] 撤回提示词 #{} 的代码更改",
+                        record.prompt_index
+                    ),
                     3, // Max 3 retries for Git lock conflicts
                 );
 
@@ -977,7 +1011,11 @@ pub async fn revert_codex_to_prompt(
                         break;
                     }
                     Err(e) => {
-                        log::warn!("[Codex Precise Revert] Revert failed for prompt #{}: {}", record.prompt_index, e);
+                        log::warn!(
+                            "[Codex Precise Revert] Revert failed for prompt #{}: {}",
+                            record.prompt_index,
+                            e
+                        );
                         revert_failed = true;
                         failure_message = e;
                         break;
@@ -1015,7 +1053,8 @@ pub async fn revert_codex_to_prompt(
                     e
                 );
 
-                if let Err(rollback_err) = simple_git::git_reset_hard(&project_path, &original_head) {
+                if let Err(rollback_err) = simple_git::git_reset_hard(&project_path, &original_head)
+                {
                     log::error!("[CRITICAL] Git rollback failed: {}", rollback_err);
                     return Err(format!(
                         "会话截断失败且 Git 回滚失败。\n\
@@ -1025,10 +1064,7 @@ pub async fn revert_codex_to_prompt(
                     ));
                 }
 
-                return Err(format!(
-                    "会话截断失败，已原子性回滚 Git 更改。原因: {}",
-                    e
-                ));
+                return Err(format!("会话截断失败，已原子性回滚 Git 更改。原因: {}", e));
             }
 
             // Truncate git records
@@ -1040,7 +1076,9 @@ pub async fn revert_codex_to_prompt(
                         e
                     );
 
-                    if let Err(rollback_err) = simple_git::git_reset_hard(&project_path, &original_head) {
+                    if let Err(rollback_err) =
+                        simple_git::git_reset_hard(&project_path, &original_head)
+                    {
                         log::error!("[CRITICAL] Git rollback failed: {}", rollback_err);
                         return Err(format!(
                             "Git 记录截断失败且回滚失败。\n\

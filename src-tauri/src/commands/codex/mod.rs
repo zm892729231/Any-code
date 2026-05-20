@@ -29,7 +29,10 @@ pub use git_ops::{CodexGitRecords, CodexPromptGitRecord, CodexPromptRecord, Prom
 
 // Config types
 #[allow(unused_imports)]
-pub use config::{CodexAvailability, CodexModeInfo, CodexMultiAgentConfig, CodexProviderConfig, CurrentCodexConfig};
+pub use config::{
+    CodexAvailability, CodexModeInfo, CodexMultiAgentConfig, CodexProviderConfig,
+    CurrentCodexConfig,
+};
 
 // Session converter types
 #[allow(unused_imports)]
@@ -103,4 +106,6 @@ pub use usage::get_codex_usage_stats;
 
 // Usage types
 #[allow(unused_imports)]
-pub use usage::{CodexDailyUsage, CodexModelUsage, CodexProjectUsage, CodexSessionUsage, CodexUsageStats};
+pub use usage::{
+    CodexDailyUsage, CodexModelUsage, CodexProjectUsage, CodexSessionUsage, CodexUsageStats,
+};

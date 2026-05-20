@@ -141,6 +141,7 @@ export interface ClaudeExecutionConfig {
   verbose: boolean;
   permissions: ClaudePermissionConfig;
   disable_rewind_git_operations: boolean;
+  disable_prompt_auto_commit: boolean;
 }
 
 /**
@@ -638,6 +639,7 @@ export interface SessionContext {
 export type SessionStatus =
   | 'Active'
   | 'Idle'
+  | 'CompactionPending'
   | 'Compacting'
   | { CompactionFailed: string };
 

@@ -368,7 +368,13 @@ pub async fn check_gemini_rewind_capabilities(
         .find(|r| r.prompt_index == prompt_index);
 
     if let Some(record) = git_record {
-        let has_valid_commit = !record.commit_before.is_empty() && record.commit_before != "NONE";
+        let has_valid_commit = !record.commit_before.is_empty()
+            && record.commit_before != "NONE"
+            && record
+                .commit_after
+                .as_ref()
+                .map(|commit_after| commit_after != &record.commit_before)
+                .unwrap_or(false);
 
         log::info!(
             "[Gemini Rewind] ✅ Prompt #{} with git record: has_valid_commit={}",
@@ -498,25 +504,31 @@ pub async fn record_gemini_prompt_completed(
         return Ok(());
     }
 
-    // Auto-commit any changes made by AI
-    let commit_message =
-        build_prompt_commit_message("[Gemini]", prompt_text.as_deref(), prompt_index);
-    match simple_git::git_commit_changes(&project_path, &commit_message) {
-        Ok(true) => {
-            log::info!(
-                "[Gemini Record] Auto-committed changes after prompt #{}",
-                prompt_index
-            );
-        }
-        Ok(false) => {
-            log::debug!(
-                "[Gemini Record] No changes to commit after prompt #{}",
-                prompt_index
-            );
-        }
-        Err(e) => {
-            log::warn!("[Gemini Record] Failed to auto-commit: {}", e);
-            // Continue anyway
+    if execution_config.disable_prompt_auto_commit {
+        log::info!(
+            "[Gemini Record] Prompt auto-commit disabled, keeping working tree without Git commit"
+        );
+    } else {
+        // Auto-commit any changes made by AI
+        let commit_message =
+            build_prompt_commit_message("[Gemini]", prompt_text.as_deref(), prompt_index);
+        match simple_git::git_commit_changes(&project_path, &commit_message) {
+            Ok(true) => {
+                log::info!(
+                    "[Gemini Record] Auto-committed changes after prompt #{}",
+                    prompt_index
+                );
+            }
+            Ok(false) => {
+                log::debug!(
+                    "[Gemini Record] No changes to commit after prompt #{}",
+                    prompt_index
+                );
+            }
+            Err(e) => {
+                log::warn!("[Gemini Record] Failed to auto-commit: {}", e);
+                // Continue anyway
+            }
         }
     }
 
@@ -715,7 +727,10 @@ pub async fn revert_gemini_to_prompt(
         }
 
         RewindMode::CodeOnly => {
-            log::info!("[Gemini Rewind] Reverting code to state before prompt #{}", prompt_index);
+            log::info!(
+                "[Gemini Rewind] Reverting code to state before prompt #{}",
+                prompt_index
+            );
 
             // Stash uncommitted changes
             simple_git::git_stash_save(
@@ -765,7 +780,10 @@ pub async fn revert_gemini_to_prompt(
                 let commit_after = match &record.commit_after {
                     Some(c) if c != &record.commit_before => c.clone(),
                     _ => {
-                        log::debug!("[Gemini Precise Revert] Skipping prompt #{} - no code changes", record.prompt_index);
+                        log::debug!(
+                            "[Gemini Precise Revert] Skipping prompt #{} - no code changes",
+                            record.prompt_index
+                        );
                         continue;
                     }
                 };
@@ -807,7 +825,10 @@ pub async fn revert_gemini_to_prompt(
                     &project_path,
                     &record.commit_before,
                     &commit_after,
-                    &format!("[Gemini Revert] 撤回提示词 #{} 的代码更改", record.prompt_index),
+                    &format!(
+                        "[Gemini Revert] 撤回提示词 #{} 的代码更改",
+                        record.prompt_index
+                    ),
                     3, // Max 3 retries for Git lock conflicts
                 );
 
@@ -831,7 +852,11 @@ pub async fn revert_gemini_to_prompt(
                         break;
                     }
                     Err(e) => {
-                        log::warn!("[Gemini Precise Revert] Revert failed for prompt #{}: {}", record.prompt_index, e);
+                        log::warn!(
+                            "[Gemini Precise Revert] Revert failed for prompt #{}: {}",
+                            record.prompt_index,
+                            e
+                        );
                         revert_failed = true;
                         failure_message = e;
                         break;
@@ -863,7 +888,10 @@ pub async fn revert_gemini_to_prompt(
         }
 
         RewindMode::Both => {
-            log::info!("[Gemini Rewind] Reverting both to state before prompt #{}", prompt_index);
+            log::info!(
+                "[Gemini Rewind] Reverting both to state before prompt #{}",
+                prompt_index
+            );
 
             // Stash uncommitted changes
             simple_git::git_stash_save(
@@ -913,7 +941,10 @@ pub async fn revert_gemini_to_prompt(
                 let commit_after = match &record.commit_after {
                     Some(c) if c != &record.commit_before => c.clone(),
                     _ => {
-                        log::debug!("[Gemini Precise Revert] Skipping prompt #{} - no code changes", record.prompt_index);
+                        log::debug!(
+                            "[Gemini Precise Revert] Skipping prompt #{} - no code changes",
+                            record.prompt_index
+                        );
                         continue;
                     }
                 };
@@ -955,7 +986,10 @@ pub async fn revert_gemini_to_prompt(
                     &project_path,
                     &record.commit_before,
                     &commit_after,
-                    &format!("[Gemini Revert] 撤回提示词 #{} 的代码更改", record.prompt_index),
+                    &format!(
+                        "[Gemini Revert] 撤回提示词 #{} 的代码更改",
+                        record.prompt_index
+                    ),
                     3, // Max 3 retries for Git lock conflicts
                 );
 
@@ -979,7 +1013,11 @@ pub async fn revert_gemini_to_prompt(
                         break;
                     }
                     Err(e) => {
-                        log::warn!("[Gemini Precise Revert] Revert failed for prompt #{}: {}", record.prompt_index, e);
+                        log::warn!(
+                            "[Gemini Precise Revert] Revert failed for prompt #{}: {}",
+                            record.prompt_index,
+                            e
+                        );
                         revert_failed = true;
                         failure_message = e;
                         break;
@@ -1011,13 +1049,16 @@ pub async fn revert_gemini_to_prompt(
 
             // Truncate session
             // 🔧 ATOMIC PROTECTION: If session truncation fails, rollback Git changes
-            if let Err(e) = truncate_gemini_session_to_prompt(&session_id, &project_path, prompt_index) {
+            if let Err(e) =
+                truncate_gemini_session_to_prompt(&session_id, &project_path, prompt_index)
+            {
                 log::error!(
                     "[Gemini Atomic Rollback] Session truncation failed, rolling back Git: {}",
                     e
                 );
 
-                if let Err(rollback_err) = simple_git::git_reset_hard(&project_path, &original_head) {
+                if let Err(rollback_err) = simple_git::git_reset_hard(&project_path, &original_head)
+                {
                     log::error!("[CRITICAL] Git rollback failed: {}", rollback_err);
                     return Err(format!(
                         "会话截断失败且 Git 回滚失败。\n\
@@ -1027,10 +1068,7 @@ pub async fn revert_gemini_to_prompt(
                     ));
                 }
 
-                return Err(format!(
-                    "会话截断失败，已原子性回滚 Git 更改。原因: {}",
-                    e
-                ));
+                return Err(format!("会话截断失败，已原子性回滚 Git 更改。原因: {}", e));
             }
 
             // Truncate git records
@@ -1042,7 +1080,9 @@ pub async fn revert_gemini_to_prompt(
                         e
                     );
 
-                    if let Err(rollback_err) = simple_git::git_reset_hard(&project_path, &original_head) {
+                    if let Err(rollback_err) =
+                        simple_git::git_reset_hard(&project_path, &original_head)
+                    {
                         log::error!("[CRITICAL] Git rollback failed: {}", rollback_err);
                         return Err(format!(
                             "Git 记录截断失败且回滚失败。\n\

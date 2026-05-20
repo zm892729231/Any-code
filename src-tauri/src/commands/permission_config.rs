@@ -70,6 +70,8 @@ pub struct ClaudeExecutionConfig {
     pub permissions: ClaudePermissionConfig,
     #[serde(default)]
     pub disable_rewind_git_operations: bool,
+    #[serde(default)]
+    pub disable_prompt_auto_commit: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,6 +91,7 @@ impl Default for ClaudeExecutionConfig {
             verbose: true,
             permissions: ClaudePermissionConfig::default(),
             disable_rewind_git_operations: false,
+            disable_prompt_auto_commit: false,
         }
     }
 }
@@ -143,7 +146,8 @@ pub fn build_execution_args(config: &ClaudeExecutionConfig, model: &str) -> Vec<
     // 🔥 修复：仅为内置模型添加 --model 参数
     // 对于自定义模型（非 sonnet/opus/sonnet[1m]/opus[1m]），通过 ANTHROPIC_MODEL 环境变量设置
     // 避免命令行参数与环境变量冲突导致发送失败
-    let is_builtin_model = model == "sonnet" || model == "opus" || model == "sonnet[1m]" || model == "opus[1m]";
+    let is_builtin_model =
+        model == "sonnet" || model == "opus" || model == "sonnet[1m]" || model == "opus[1m]";
     if is_builtin_model {
         args.push("--model".to_string());
         args.push(model.to_string());

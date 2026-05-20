@@ -172,7 +172,10 @@ fn load_claude_wsl_config() -> Option<ClaudeWslConfig> {
     let config_file = home_dir.join(".claude").join("workbench_config.json");
 
     if !config_file.exists() {
-        log::debug!("[Claude WSL Config] Config file not found: {:?}", config_file);
+        log::debug!(
+            "[Claude WSL Config] Config file not found: {:?}",
+            config_file
+        );
         return None;
     }
 
@@ -270,7 +273,10 @@ fn load_gemini_wsl_config() -> Option<GeminiWslConfig> {
     let config_file = home_dir.join(".gemini").join("workbench_config.json");
 
     if !config_file.exists() {
-        log::debug!("[Gemini WSL Config] Config file not found: {:?}", config_file);
+        log::debug!(
+            "[Gemini WSL Config] Config file not found: {:?}",
+            config_file
+        );
         return None;
     }
 
@@ -483,7 +489,10 @@ pub fn is_native_codex_available() -> bool {
     // 覆盖 env、PATH、注册表、常见目录以及用户配置（binaries.json）。
     let (_env, detected) = detect_binary_for_tool("codex", "CODEX_PATH", "codex");
     let available = detected.is_some();
-    debug!("[WSL] Native Codex available (unified detection): {}", available);
+    debug!(
+        "[WSL] Native Codex available (unified detection): {}",
+        available
+    );
     available
 }
 
@@ -650,7 +659,10 @@ pub fn is_native_claude_available() -> bool {
     // 覆盖 env、PATH、注册表、常见目录以及用户配置（binaries.json）。
     let (_env, detected) = detect_binary_for_tool("claude", "CLAUDE_PATH", "claude");
     let available = detected.is_some();
-    debug!("[Claude WSL] Native Claude available (unified detection): {}", available);
+    debug!(
+        "[Claude WSL] Native Claude available (unified detection): {}",
+        available
+    );
     available
 }
 
@@ -1080,7 +1092,10 @@ pub fn check_wsl_gemini(distro: Option<&str>) -> Option<String> {
 
         if let Ok(output) = test_cmd.output() {
             if output.status.success() {
-                info!("[Gemini WSL] Found gemini via direct path check at: {}", path);
+                info!(
+                    "[Gemini WSL] Found gemini via direct path check at: {}",
+                    path
+                );
                 return Some(path.clone());
             }
         }
@@ -1281,7 +1296,10 @@ impl GeminiWslRuntime {
                 Some(unc_path)
             } else {
                 // Gemini 不需要 .gemini 目录就能工作，所以这不是必须的
-                debug!("[Gemini WSL] .gemini directory not found at: {:?}", unc_path);
+                debug!(
+                    "[Gemini WSL] .gemini directory not found at: {:?}",
+                    unc_path
+                );
                 None
             }
         } else {
@@ -1467,7 +1485,10 @@ pub fn check_wsl_claude(distro: Option<&str>) -> Option<String> {
         if let Ok(output) = test_cmd.output() {
             if output.status.success() {
                 if verify_wsl_claude_executable(path, distro) {
-                    info!("[Claude WSL] Found claude via direct path check at: {}", path);
+                    info!(
+                        "[Claude WSL] Found claude via direct path check at: {}",
+                        path
+                    );
                     return Some(path.clone());
                 }
             }
@@ -1770,13 +1791,20 @@ fn try_parse_wsl_unc_path(windows_path: &str) -> Option<(String, String)> {
 pub fn windows_to_wsl_path(windows_path: &str) -> String {
     // 处理 WSL UNC 路径（支持）
     if let Some((_distro, wsl_path)) = try_parse_wsl_unc_path(windows_path) {
-        log::debug!("[WSL] UNC->WSL Path converted: {} -> {}", windows_path, wsl_path);
+        log::debug!(
+            "[WSL] UNC->WSL Path converted: {} -> {}",
+            windows_path,
+            wsl_path
+        );
         return wsl_path;
     }
 
     // 其他 UNC 路径（不支持）
     if windows_path.starts_with("\\\\") {
-        log::warn!("[WSL] UNC paths are not supported (except WSL): {}", windows_path);
+        log::warn!(
+            "[WSL] UNC paths are not supported (except WSL): {}",
+            windows_path
+        );
         return windows_path.to_string();
     }
 

@@ -23,11 +23,10 @@ fn read_json_value(path: &Path) -> Result<Value, String> {
         return Ok(serde_json::json!({}));
     }
 
-    let content = fs::read_to_string(path)
-        .map_err(|e| format!("读取配置文件失败: {}", e))?;
+    let content = fs::read_to_string(path).map_err(|e| format!("读取配置文件失败: {}", e))?;
 
-    let value: Value = serde_json::from_str(&content)
-        .map_err(|e| format!("解析 JSON 失败: {}", e))?;
+    let value: Value =
+        serde_json::from_str(&content).map_err(|e| format!("解析 JSON 失败: {}", e))?;
 
     Ok(value)
 }
@@ -35,19 +34,16 @@ fn read_json_value(path: &Path) -> Result<Value, String> {
 /// 原子写入 JSON 文件
 fn write_json_value(path: &Path, value: &Value) -> Result<(), String> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("创建目录失败: {}", e))?;
+        fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
     }
 
-    let json = serde_json::to_string_pretty(value)
-        .map_err(|e| format!("序列化 JSON 失败: {}", e))?;
+    let json =
+        serde_json::to_string_pretty(value).map_err(|e| format!("序列化 JSON 失败: {}", e))?;
 
     let tmp_path = path.with_extension("tmp");
-    fs::write(&tmp_path, json.as_bytes())
-        .map_err(|e| format!("写入临时文件失败: {}", e))?;
+    fs::write(&tmp_path, json.as_bytes()).map_err(|e| format!("写入临时文件失败: {}", e))?;
 
-    fs::rename(&tmp_path, path)
-        .map_err(|e| format!("重命名文件失败: {}", e))?;
+    fs::rename(&tmp_path, path).map_err(|e| format!("重命名文件失败: {}", e))?;
 
     Ok(())
 }
@@ -102,9 +98,10 @@ pub fn set_mcp_servers_map(servers: &HashMap<String, Value>) -> Result<(), Strin
 
         // 提取 server 字段（如果存在）
         if let Some(server_val) = obj.remove("server") {
-            let server_obj = server_val.as_object().cloned().ok_or_else(|| {
-                format!("MCP 服务器 '{}' server 字段不是对象", id)
-            })?;
+            let server_obj = server_val
+                .as_object()
+                .cloned()
+                .ok_or_else(|| format!("MCP 服务器 '{}' server 字段不是对象", id))?;
             obj = server_obj;
         }
 

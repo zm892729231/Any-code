@@ -418,6 +418,7 @@
     "usageLabel": "使用情况",
     "compress": "压缩",
     "active": "活跃",
+    "pendingCompaction": "等待压缩",
     "compacting": "压缩中",
     "idle": "空闲",
     "compactionFailed": "压缩失败"
@@ -587,6 +588,8 @@
     "verboseOutputDescription": "显示完整的 bash 和命令输出",
     "promptSuggestion": "智能输入建议",
     "promptSuggestionDescription": "基于对话上下文自动生成输入建议，按 Tab 接受",
+    "disablePromptAutoCommit": "关闭每轮自动提交",
+    "disablePromptAutoCommitDescription": "每次对话结束后不再自动创建 Git 提交；会话记录仍会保留，但按轮回退代码将不可用或受限",
     "disableRewindGitOps": "禁用撤回中的 Git 操作",
     "disableRewindGitOpsDescription": "启用后，撤回功能只能删除对话历史，无法回滚代码变更（适用于多人协作或生产环境）",
     "chatRetentionDays": "聊天记录保留天数",
@@ -1341,7 +1344,10 @@
     "remove": "删除",
     "enterPrompt": "输入您的提示词...",
     "enhancing": "优化中...",
-    "enhancePrompt": "优化提示词"
+    "enhancePrompt": "优化提示词",
+    "processingStatus": "处理中",
+    "processingStatusHint": "正在持续输出，你可以继续查看历史消息",
+    "processingStatusAction": "回到最新消息"
   },
   "updateBadge": {
     "newVersionAvailable": "有新版本可用",

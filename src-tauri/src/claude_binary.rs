@@ -843,7 +843,11 @@ mod fnm_multishell_tests {
         fs::write(&f1, "@echo off\r\necho codex\r\n").unwrap();
         fs::write(&f2, "@echo off\r\necho codex\r\n").unwrap();
 
-        let aliases = vec!["codex.exe".to_string(), "codex.cmd".to_string(), "codex".to_string()];
+        let aliases = vec![
+            "codex.exe".to_string(),
+            "codex.cmd".to_string(),
+            "codex".to_string(),
+        ];
         let found = find_fnm_multishell_candidates(&local_appdata, &aliases);
 
         let f1s = PathBuf::from(f1).to_string_lossy().to_string();

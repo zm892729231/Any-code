@@ -4,12 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag, e.g. v5.28.5. Empty uses package.json version."
+        description: "Release tag, e.g. v5.28.6. Empty uses package.json version."
         required: false
         type: string
-  push:
-    tags:
-      - "v*-macos*"
 
 env:
   CARGO_TERM_COLOR: always
@@ -21,6 +18,7 @@ permissions:
 jobs:
   build-macos:
     name: Build macOS ${{ matrix.asset-arch }}
+    if: ${{ !contains(github.ref_name, '-macos') }}
     strategy:
       fail-fast: false
       matrix:
@@ -48,11 +46,8 @@ jobs:
           if [ "${{ github.ref_type }}" = "tag" ]; then
             raw_tag="${{ github.ref_name }}"
             version="${raw_tag#v}"
-            version="${version%-macos}"
-            version="${version%%-macos.*}"
           elif [ -n "$input_tag" ]; then
-            tag="${input_tag#v}"
-            version="$tag"
+            version="${input_tag#v}"
           else
             version="$(node -p "require('./package.json').version")"
           fi
@@ -196,6 +191,7 @@ jobs:
 
   publish-macos:
     name: Publish macOS Release Assets
+    if: ${{ !contains(github.ref_name, '-macos') }}
     needs: build-macos
     runs-on: ubuntu-latest
 
@@ -211,11 +207,8 @@ jobs:
           if [ "${{ github.ref_type }}" = "tag" ]; then
             raw_tag="${{ github.ref_name }}"
             version="${raw_tag#v}"
-            version="${version%-macos}"
-            version="${version%%-macos.*}"
           elif [ -n "$input_tag" ]; then
-            tag="${input_tag#v}"
-            version="$tag"
+            version="${input_tag#v}"
           else
             version="$(node -p "require('./package.json').version")"
           fi
@@ -241,63 +234,47 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          python3 - <<'PY'
-          import glob
-          import json
-          import os
-          from datetime import datetime, timezone
+          aarch64_sig="$(find artifacts -name "*_aarch64.app.tar.gz.sig" -type f | head -n 1)"
+          x64_sig="$(find artifacts -name "*_x64.app.tar.gz.sig" -type f | head -n 1)"
 
-          version = os.environ["VERSION"]
-          tag = os.environ["TAG"]
-          repo = os.environ["GITHUB_REPOSITORY"]
+          if [ -z "$aarch64_sig" ] || [ -z "$x64_sig" ]; then
+            echo "::error::Missing macOS updater signatures."
+            exit 1
+          fi
 
-          if os.path.exists("latest-existing.json"):
-            with open("latest-existing.json", "r", encoding="utf-8-sig") as f:
-              data = json.load(f)
-          else:
-            data = {"platforms": {}}
+          python3 .github/scripts/merge_latest_json.py \
+            --version "$VERSION" \
+            --tag "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --output latest.json \
+            --existing latest-existing.json \
+            --platform "darwin-aarch64|$aarch64_sig|any-code_${VERSION}_aarch64.app.tar.gz" \
+            --platform "darwin-x86_64|$x64_sig|any-code_${VERSION}_x64.app.tar.gz"
 
-          data["version"] = version
-          data["pub_date"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-          data["notes"] = f"See the full changelog at https://github.com/{repo}/releases/tag/{tag}"
-          data.setdefault("platforms", {})
-
-          entries = {
-            "darwin-aarch64": ("*_aarch64.app.tar.gz.sig", f"any-code_{version}_aarch64.app.tar.gz"),
-            "darwin-x86_64": ("*_x64.app.tar.gz.sig", f"any-code_{version}_x64.app.tar.gz"),
-          }
-
-          for platform, (sig_pattern, asset_name) in entries.items():
-            matches = glob.glob(f"artifacts/**/{sig_pattern}", recursive=True)
-            if not matches:
-              raise SystemExit(f"Missing signature for {platform}: {sig_pattern}")
-            with open(matches[0], "r", encoding="utf-8") as f:
-              signature = f.read().strip()
-            if not signature:
-              raise SystemExit(f"Empty signature for {platform}")
-
-            data["platforms"][platform] = {
-              "signature": signature,
-              "url": f"https://github.com/{repo}/releases/download/{tag}/{asset_name}",
-            }
-
-          with open("latest.json", "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-            f.write("\n")
-          PY
+      - name: Prepare release notes
+        shell: bash
+        run: |
+          python3 .github/scripts/generate_release_notes.py \
+            --version "${{ steps.version.outputs.version }}" \
+            --tag "${{ steps.version.outputs.tag }}" \
+            --output release-notes.md
 
       - name: Publish GitHub Release
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           tag="${{ steps.version.outputs.tag }}"
-          version="${{ steps.version.outputs.version }}"
 
-          if ! gh release view "$tag" >/dev/null 2>&1; then
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" \
+              --title "Any Code $tag" \
+              --notes-file release-notes.md
+          else
             gh release create "$tag" \
               --title "Any Code $tag" \
-              --notes "macOS build artifacts for Any Code $tag."
+              --notes-file release-notes.md
           fi
 
           mapfile -t files < <(find artifacts -type f \( \

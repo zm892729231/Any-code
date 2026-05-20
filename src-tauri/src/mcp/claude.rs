@@ -3,7 +3,6 @@
 use serde_json::Value;
 use std::collections::HashMap;
 
-
 /// 将单个 MCP 服务器同步到 Claude live 配置
 pub fn sync_single_server_to_claude(id: &str, server_spec: &Value) -> Result<(), String> {
     // 读取现有的 MCP 配置

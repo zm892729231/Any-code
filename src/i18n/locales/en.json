@@ -418,6 +418,7 @@
     "usageLabel": "Usage",
     "compress": "Compress",
     "active": "Active",
+    "pendingCompaction": "Pending Compaction",
     "compacting": "Compacting",
     "idle": "Idle",
     "compactionFailed": "Compaction Failed"
@@ -587,6 +588,8 @@
     "verboseOutputDescription": "Show full bash and command output",
     "promptSuggestion": "Prompt Suggestions",
     "promptSuggestionDescription": "Auto-generate input suggestions based on conversation context, press Tab to accept",
+    "disablePromptAutoCommit": "Disable Auto Commit After Prompt",
+    "disablePromptAutoCommitDescription": "Stop creating a Git commit after each conversation turn; conversation history stays, but per-turn code rewind may be unavailable or limited",
     "disableRewindGitOps": "Disable Git Operations in Rewind",
     "disableRewindGitOpsDescription": "When enabled, rewind can only delete conversation history, cannot rollback code changes (suitable for collaboration or production)",
     "chatRetentionDays": "Chat Retention Days",
@@ -1309,7 +1312,10 @@
     "remove": "Remove",
     "enterPrompt": "Enter your prompt...",
     "enhancing": "Enhancing...",
-    "enhancePrompt": "Enhance prompt"
+    "enhancePrompt": "Enhance prompt",
+    "processingStatus": "Processing",
+    "processingStatusHint": "Output is still streaming. You can keep browsing older messages.",
+    "processingStatusAction": "Back to latest"
   },
   "updateBadge": {
     "newVersionAvailable": "New version available",

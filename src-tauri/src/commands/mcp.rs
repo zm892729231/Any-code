@@ -916,7 +916,8 @@ pub async fn mcp_read_claude_config() -> Result<Option<String>, String> {
 /// 获取所有 MCP 服务器（从 Claude 配置）
 /// @deprecated 使用 mcp_get_unified_servers 获取真实的多应用状态
 #[tauri::command]
-pub async fn mcp_get_all_servers() -> Result<std::collections::HashMap<String, serde_json::Value>, String> {
+pub async fn mcp_get_all_servers(
+) -> Result<std::collections::HashMap<String, serde_json::Value>, String> {
     crate::claude_mcp::read_mcp_servers_map()
 }
 
@@ -925,7 +926,8 @@ pub async fn mcp_get_all_servers() -> Result<std::collections::HashMap<String, s
 /// 返回合并后的服务器列表，每个服务器的 apps 字段标记了它在哪些应用中真正启用
 /// @deprecated 使用分引擎的API代替（mcp_get_engine_servers）
 #[tauri::command]
-pub async fn mcp_get_unified_servers() -> Result<std::collections::HashMap<String, McpServer>, String> {
+pub async fn mcp_get_unified_servers(
+) -> Result<std::collections::HashMap<String, McpServer>, String> {
     info!("Getting unified MCP servers from all apps");
     crate::mcp::get_unified_servers()
 }
@@ -994,10 +996,7 @@ pub async fn mcp_delete_engine_server(engine: String, id: String) -> Result<Stri
     // 从注册表中删除（永久删除）
     crate::mcp::registry::remove_server(&id)?;
 
-    Ok(format!(
-        "成功从 {} 引擎中删除 MCP 服务器 '{}'",
-        engine, id
-    ))
+    Ok(format!("成功从 {} 引擎中删除 MCP 服务器 '{}'", engine, id))
 }
 
 /// 切换指定引擎中 MCP 服务器的启用状态
@@ -1032,17 +1031,11 @@ pub async fn mcp_toggle_engine_server(
         // 启用：添加到配置文件
         crate::mcp::validate_server_spec(&server_spec)?;
         crate::mcp::sync_server_to_app(&id, &server_spec, &app_type)?;
-        Ok(format!(
-            "已在 {} 引擎中启用 MCP 服务器 '{}'",
-            engine, id
-        ))
+        Ok(format!("已在 {} 引擎中启用 MCP 服务器 '{}'", engine, id))
     } else {
         // 禁用：从配置文件中移除（但保留在注册表中）
         crate::mcp::remove_server_from_app(&id, &app_type)?;
-        Ok(format!(
-            "已在 {} 引擎中禁用 MCP 服务器 '{}'",
-            engine, id
-        ))
+        Ok(format!("已在 {} 引擎中禁用 MCP 服务器 '{}'", engine, id))
     }
 }
 

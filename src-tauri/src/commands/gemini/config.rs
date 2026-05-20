@@ -508,7 +508,6 @@ pub struct GeminiWslModeInfo {
     pub is_windows: bool,
 }
 
-
 /// Get Gemini WSL mode configuration
 /// 使用全局缓存避免重复检测，减少 WSL 进程创建
 #[tauri::command]
@@ -564,15 +563,22 @@ fn do_get_gemini_wsl_mode_config() -> GeminiWslModeInfo {
     }
 }
 
-
 /// Set Gemini WSL mode configuration
 #[tauri::command]
-pub async fn set_gemini_wsl_mode_config(mode: String, wsl_distro: Option<String>) -> Result<(), String> {
+pub async fn set_gemini_wsl_mode_config(
+    mode: String,
+    wsl_distro: Option<String>,
+) -> Result<(), String> {
     let gemini_mode = match mode.as_str() {
         "auto" => wsl_utils::GeminiMode::Auto,
         "native" => wsl_utils::GeminiMode::Native,
         "wsl" => wsl_utils::GeminiMode::Wsl,
-        _ => return Err(format!("Invalid mode: {}. Must be 'auto', 'native', or 'wsl'", mode)),
+        _ => {
+            return Err(format!(
+                "Invalid mode: {}. Must be 'auto', 'native', or 'wsl'",
+                mode
+            ))
+        }
     };
 
     let config = wsl_utils::GeminiWslConfig {

@@ -1,6 +1,7 @@
 import React, { useState, useRef, forwardRef, useImperativeHandle, useEffect, useReducer, useCallback, useMemo } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { ArrowDown, LoaderCircle, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FloatingPromptInputProps, FloatingPromptInputRef, ThinkingMode, ThinkingEffort, ModelType, ModelConfig } from "./types";
 import { getModels } from "./constants";
@@ -34,6 +35,8 @@ const FloatingPromptInputInner = (
   {
     onSend,
     isLoading = false,
+    showProcessingStatus = false,
+    onProcessingStatusClick,
     disabled = false,
     defaultModel = "sonnet",
     sessionModel,
@@ -56,6 +59,8 @@ const FloatingPromptInputInner = (
   }: FloatingPromptInputProps,
   ref: React.Ref<FloatingPromptInputRef>,
 ) => {
+  const { t } = useTranslation();
+
   // Helper function to convert backend model string to frontend ModelType
   const parseSessionModel = (modelStr?: string): ModelType | null => {
     if (!modelStr) return null;
@@ -662,6 +667,42 @@ const FloatingPromptInputInner = (
         />
 
         <div className="p-4 space-y-2">
+          {showProcessingStatus && (
+            <div
+              className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2"
+              role="status"
+              aria-live="polite"
+            >
+              <button
+                type="button"
+                onClick={onProcessingStatusClick}
+                className={cn(
+                  "flex w-full flex-col items-start gap-2 text-left sm:flex-row sm:items-center sm:justify-between",
+                  onProcessingStatusClick && "cursor-pointer"
+                )}
+              >
+                <div className="flex min-w-0 items-start gap-2 sm:items-center">
+                  <LoaderCircle className="mt-0.5 h-4 w-4 flex-shrink-0 animate-spin text-amber-500 sm:mt-0" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-foreground/90">
+                      {t('floatingInput.processingStatus', '处理中')}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {t('floatingInput.processingStatusHint', '正在持续输出，你可以继续查看历史消息')}
+                    </div>
+                  </div>
+                </div>
+
+                {onProcessingStatusClick && (
+                  <div className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                    <span>{t('floatingInput.processingStatusAction', '回到最新消息')}</span>
+                    <ArrowDown className="h-3.5 w-3.5" />
+                  </div>
+                )}
+              </button>
+            </div>
+          )}
+
           <InputArea
             ref={textareaRef}
             prompt={state.prompt}

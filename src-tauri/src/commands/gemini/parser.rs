@@ -428,8 +428,14 @@ pub fn extract_usage(event: &GeminiStreamEvent) -> Option<(u64, u64)> {
     } = event
     {
         if let Some(usage) = build_unified_usage(Some(stats), usage_metadata.as_ref()) {
-            let input = usage.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-            let output = usage.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+            let input = usage
+                .get("input_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let output = usage
+                .get("output_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
             Some((input, output))
         } else {
             let input = stats.input_tokens.unwrap_or(0);
@@ -441,7 +447,10 @@ pub fn extract_usage(event: &GeminiStreamEvent) -> Option<(u64, u64)> {
     }
 }
 
-fn build_unified_usage(stats: Option<&GeminiStats>, usage_metadata: Option<&TokenUsage>) -> Option<Value> {
+fn build_unified_usage(
+    stats: Option<&GeminiStats>,
+    usage_metadata: Option<&TokenUsage>,
+) -> Option<Value> {
     // Prefer usageMetadata when present: it can contain cached/thoughts/tool token breakdowns.
     if let Some(meta) = usage_metadata {
         let prompt = meta.prompt_token_count.unwrap_or(0);

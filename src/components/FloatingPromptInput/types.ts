@@ -66,6 +66,14 @@ export interface FloatingPromptInputProps {
    */
   isLoading?: boolean;
   /**
+   * 是否显示处理中的状态条
+   */
+  showProcessingStatus?: boolean;
+  /**
+   * 点击处理状态时回到最新消息
+   */
+  onProcessingStatusClick?: () => void;
+  /**
    * Whether the input is disabled
    */
   disabled?: boolean;

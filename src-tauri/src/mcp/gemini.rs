@@ -3,7 +3,6 @@
 use serde_json::Value;
 use std::collections::HashMap;
 
-
 /// 将单个 MCP 服务器同步到 Gemini 配置
 pub fn sync_single_server_to_gemini(id: &str, server_spec: &Value) -> Result<(), String> {
     let current = crate::gemini_mcp::read_mcp_servers_map()?;

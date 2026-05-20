@@ -248,9 +248,16 @@ pub async fn switch_gemini_provider(config: GeminiProviderConfig) -> Result<Stri
 
     // Ensure config directory exists
     if !gemini_dir.exists() {
-        log::info!("[Gemini Provider] Creating config directory: {:?}", gemini_dir);
-        fs::create_dir_all(&gemini_dir)
-            .map_err(|e| format!("Failed to create .gemini directory at {:?}: {}", gemini_dir, e))?;
+        log::info!(
+            "[Gemini Provider] Creating config directory: {:?}",
+            gemini_dir
+        );
+        fs::create_dir_all(&gemini_dir).map_err(|e| {
+            format!(
+                "Failed to create .gemini directory at {:?}: {}",
+                gemini_dir, e
+            )
+        })?;
     }
 
     // Read existing settings to preserve mcpServers and other user configs
@@ -298,7 +305,10 @@ pub async fn switch_gemini_provider(config: GeminiProviderConfig) -> Result<Stri
 
     // Return success message with mode info
     let mode_info = if is_wsl_mode { " (WSL)" } else { "" };
-    Ok(format!("成功切换到 Gemini 供应商: {}{}", config.name, mode_info))
+    Ok(format!(
+        "成功切换到 Gemini 供应商: {}{}",
+        config.name, mode_info
+    ))
 }
 
 /// Add a new Gemini provider configuration

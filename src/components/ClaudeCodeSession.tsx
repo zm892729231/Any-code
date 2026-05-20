@@ -77,6 +77,10 @@ interface ClaudeCodeSessionProps {
    * Whether this session is currently active (for event listener management)
    */
   isActive?: boolean;
+  /**
+   * ??? Plan ??????
+   */
+  planModeStorageKey?: string;
 }
 
 /**
@@ -252,52 +256,47 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
       isLoading
     });
 
-  // Fix: Scroll to bottom when session history is loaded
-  // Also re-trigger when message count changes significantly (e.g., streaming adds many messages)
+  // ????????????????????????????????
   const hasScrolledToBottomRef = useRef<string | null>(null);
-  const lastScrolledMessageCountRef = useRef(0);
 
   useEffect(() => {
-    // Check if we have messages and parentRef is attached
-    if (displayableMessages.length > 0 && parentRef.current) {
-      const currentSessionId = session?.id || 'new_session';
-      const currentCount = displayableMessages.length;
-
-      // Determine if we should scroll:
-      // 1. First time for this session (initial history load)
-      const isFirstTimeForSession = hasScrolledToBottomRef.current !== currentSessionId;
-      // 2. Message count jumped significantly (e.g., streaming added many messages at once)
-      const countDelta = currentCount - lastScrolledMessageCountRef.current;
-      const significantCountChange = lastScrolledMessageCountRef.current > 0 && countDelta >= 5;
-
-      if (isFirstTimeForSession || significantCountChange) {
-        // Use a small delay to ensure virtualizer has calculated sizes
-        const timer = setTimeout(() => {
-          if (parentRef.current) {
-            // Force scroll to bottom
-            parentRef.current.scrollTop = parentRef.current.scrollHeight;
-
-            // Sync with smart auto-scroll state
-            setUserScrolled(false);
-            setShouldAutoScroll(true);
-
-            // Mark as done for this session
-            hasScrolledToBottomRef.current = currentSessionId;
-            lastScrolledMessageCountRef.current = currentCount;
-
-            // Schedule a follow-up scroll to handle virtualizer re-measurements
-            setTimeout(() => {
-              if (parentRef.current) {
-                parentRef.current.scrollTop = parentRef.current.scrollHeight;
-              }
-            }, 200);
-          }
-        }, 150); // 150ms delay for stability
-
-        return () => clearTimeout(timer);
-      }
+    if (displayableMessages.length === 0 || !parentRef.current || userScrolled) {
+      return;
     }
-  }, [displayableMessages.length, session?.id, setUserScrolled, setShouldAutoScroll]);
+
+    const currentSessionId = session?.id || 'new_session';
+    const isFirstTimeForSession = hasScrolledToBottomRef.current !== currentSessionId;
+    if (!isFirstTimeForSession) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      if (!parentRef.current || userScrolled) {
+        return;
+      }
+
+      parentRef.current.scrollTop = parentRef.current.scrollHeight;
+      setUserScrolled(false);
+      setShouldAutoScroll(true);
+      hasScrolledToBottomRef.current = currentSessionId;
+
+      setTimeout(() => {
+        if (!parentRef.current) {
+          return;
+        }
+
+        const distanceFromBottom =
+          parentRef.current.scrollHeight - parentRef.current.scrollTop - parentRef.current.clientHeight;
+
+        // ????????????????
+        if (distanceFromBottom <= 120) {
+          parentRef.current.scrollTop = parentRef.current.scrollHeight;
+        }
+      }, 200);
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [displayableMessages.length, parentRef, session?.id, setShouldAutoScroll, setUserScrolled, userScrolled]);
 
   // ============================================================================
   // MESSAGE-LEVEL OPERATIONS (Fine-grained Undo/Redo)
@@ -455,22 +454,23 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
     processMessageWithTranslation
   });
 
-  // 🆕 包装 handleSendPrompt，发送消息时自动滚动到底部
-  // 解决问题：当用户滚动查看历史消息后发送新消息，页面不会自动滚动到底部
-  // 🔧 修复：消息数量过多时使用虚拟列表的 scrollToIndex 确保滚动到真正的底部
+  const handleJumpToLatest = useCallback(() => {
+    setUserScrolled(false);
+    setShouldAutoScroll(true);
+    sessionMessagesRef.current?.scrollToBottom();
+  }, [setShouldAutoScroll, setUserScrolled]);
+
+  // ????????????????????????????
   const handleSendPromptWithScroll = useCallback((prompt: string, model: ModelType, maxThinkingTokens?: number) => {
-    // 重置滚动状态，确保发送消息后自动滚动到底部
     setUserScrolled(false);
     setShouldAutoScroll(true);
 
-    // 使用虚拟列表的 scrollToBottom 方法，解决消息过多时 scrollHeight 估算不准的问题
-    // 延迟执行，等待消息添加到列表后再滚动
     setTimeout(() => {
-      sessionMessagesRef.current?.scrollToBottom();
+      handleJumpToLatest();
     }, 50);
 
     handleSendPrompt(prompt, model, maxThinkingTokens);
-  }, [handleSendPrompt, setUserScrolled, setShouldAutoScroll]);
+  }, [handleJumpToLatest, handleSendPrompt, setUserScrolled, setShouldAutoScroll]);
 
   // 🆕 方案 B-1: 设置发送提示词回调，用于计划批准后自动执行
   useEffect(() => {
@@ -979,6 +979,7 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
   // Determine if we're in "new session" mode (no session yet, showing project picker)
   // In this mode, the page content should be scrollable as a whole
   const isNewSessionMode = !effectiveSession && displayableMessages.length === 0;
+  const showProcessingStatus = isLoading && userScrolled && displayableMessages.length > 0;
 
   // Show project path input only when:
   // 1. No initial session prop AND
@@ -1112,12 +1113,7 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: 20, scale: 0.8 }}
                           className="flex flex-col items-center gap-1 bg-background/60 backdrop-blur-md border border-border/50 rounded-xl px-1.5 py-2 cursor-pointer hover:bg-accent/80 shadow-sm"
-                          onClick={() => {
-                            setUserScrolled(false);
-                            setShouldAutoScroll(true);
-                            // 使用虚拟列表的 scrollToBottom，解决消息过多时滚动不到底的问题
-                            sessionMessagesRef.current?.scrollToBottom();
-                          }}
+                          onClick={handleJumpToLatest}
                           title={t('claudeSession.newMessage')}
                         >
                           <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
@@ -1155,12 +1151,7 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => {
-                          setUserScrolled(false);
-                          setShouldAutoScroll(true);
-                          // 使用虚拟列表的 scrollToBottom，解决消息过多时滚动不到底的问题
-                          sessionMessagesRef.current?.scrollToBottom();
-                        }}
+                        onClick={handleJumpToLatest}
                         className="px-1.5 py-1.5 hover:bg-accent/80 rounded-none h-auto min-h-0"
                         title={t('claudeSession.scrollToBottom')}
                       >
@@ -1235,6 +1226,8 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
             onSend={handleSendPromptWithScroll}
             onCancel={handleCancelExecution}
             isLoading={isLoading}
+            showProcessingStatus={showProcessingStatus}
+            onProcessingStatusClick={handleJumpToLatest}
             disabled={!projectPath}
             projectPath={projectPath}
             sessionId={effectiveSession?.id}         // 🆕 传递会话 ID
@@ -1298,9 +1291,18 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
 };
 
 export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = (props) => {
+  const planModeStorageKey = useMemo(() => {
+    if (props.planModeStorageKey) return props.planModeStorageKey;
+    if (props.session?.id) return `plan-mode:session:${props.session.id}`;
+    if (props.initialProjectPath) {
+      return `plan-mode:path:${props.initialProjectPath.replace(/\\/g, '/').toLowerCase()}`;
+    }
+    return `plan-mode:instance:${crypto.randomUUID()}`;
+  }, [props.planModeStorageKey, props.session?.id, props.initialProjectPath]);
+
   return (
     <MessagesProvider initialFilterConfig={{ hideWarmupMessages: true }}>
-      <PlanModeProvider>
+      <PlanModeProvider storageKey={planModeStorageKey}>
         <UserQuestionProvider>
           <ClaudeCodeSessionInner {...props} />
         </UserQuestionProvider>

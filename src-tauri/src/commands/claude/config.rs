@@ -1078,7 +1078,8 @@ fn do_get_claude_wsl_mode_config() -> ClaudeWslModeInfo {
     };
 
     #[cfg(not(target_os = "windows"))]
-    let (wsl_available, available_distros, native_available, is_windows) = (false, vec![], true, false);
+    let (wsl_available, available_distros, native_available, is_windows) =
+        (false, vec![], true, false);
 
     let wsl_claude_version = if runtime.enabled {
         wsl_utils::get_wsl_claude_version(runtime.distro.as_deref())
@@ -1139,8 +1140,5 @@ pub async fn set_claude_wsl_mode_config(
         config.wsl_distro
     );
 
-    Ok(
-        "Configuration saved. Please restart the app for changes to take effect."
-            .to_string(),
-    )
+    Ok("Configuration saved. Please restart the app for changes to take effect.".to_string())
 }

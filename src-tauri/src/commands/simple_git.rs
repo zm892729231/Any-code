@@ -159,9 +159,33 @@ pub fn git_commit_changes(project_path: &str, message: &str) -> Result<bool, Str
         ));
     }
 
-    // Commit changes (always create a commit, even if empty)
+    // 如果没有可提交的变更，直接返回，避免生成空提交
+    let mut diff_cmd = Command::new("git");
+    diff_cmd.args(["diff", "--cached", "--quiet"]);
+    diff_cmd.current_dir(project_path);
+
+    #[cfg(target_os = "windows")]
+    diff_cmd.creation_flags(0x08000000);
+
+    let diff_output = diff_cmd
+        .output()
+        .map_err(|e| format!("Failed to check staged changes: {}", e))?;
+
+    if diff_output.status.success() {
+        log::debug!("No staged changes to commit");
+        return Ok(false);
+    }
+
+    if diff_output.status.code() != Some(1) {
+        return Err(format!(
+            "Git diff --cached failed: {}",
+            String::from_utf8_lossy(&diff_output.stderr)
+        ));
+    }
+
+    // Commit changes
     let mut commit_cmd = Command::new("git");
-    commit_cmd.args(["commit", "--allow-empty", "-m", message]);
+    commit_cmd.args(["commit", "-m", message]);
     commit_cmd.current_dir(project_path);
 
     #[cfg(target_os = "windows")]
@@ -334,8 +358,7 @@ pub fn git_revert_range_with_retry(
 
     Err(format!(
         "Git revert 在 {} 次重试后仍失败: {}",
-        max_retries,
-        last_error
+        max_retries, last_error
     ))
 }
 
@@ -380,8 +403,8 @@ pub fn git_revert_range(
     }
 
     // Count commits in range
-    let commit_count = git_commit_count_between(project_path, commit_before, commit_after)
-        .unwrap_or(1);
+    let commit_count =
+        git_commit_count_between(project_path, commit_before, commit_after).unwrap_or(1);
 
     log::info!(
         "[Precise Revert] Found {} commits in range to revert",
@@ -601,7 +624,11 @@ pub fn git_commit_count_between(
     to_commit: &str,
 ) -> Result<usize, String> {
     let mut cmd = Command::new("git");
-    cmd.args(["rev-list", "--count", &format!("{}..{}", from_commit, to_commit)]);
+    cmd.args([
+        "rev-list",
+        "--count",
+        &format!("{}..{}", from_commit, to_commit),
+    ]);
     cmd.current_dir(project_path);
 
     #[cfg(target_os = "windows")]
@@ -784,4 +811,3 @@ pub fn check_reset_safety(
         warning,
     })
 }
-

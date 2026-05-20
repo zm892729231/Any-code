@@ -52,6 +52,7 @@ pub async fn update_session_context(
 
     if compaction_triggered {
         info!("Auto-compaction triggered for session {}", session_id);
+        state.0.mark_compaction_running(&session_id)?;
 
         // Execute compaction in background
         let manager = state.0.clone();
@@ -83,6 +84,7 @@ pub async fn trigger_manual_compaction(
         state.0.update_config(config)?;
     }
 
+    state.0.mark_compaction_running(&session_id)?;
     state.0.execute_compaction(app, &session_id).await?;
     Ok(())
 }

@@ -329,13 +329,17 @@ pub async fn list_plugins(_project_path: Option<String>) -> Result<Vec<PluginInf
         let installed_plugins_path = claude_dir.join("plugins").join("installed_plugins.json");
 
         if installed_plugins_path.exists() {
-            debug!("Reading installed_plugins.json from {:?}", installed_plugins_path);
+            debug!(
+                "Reading installed_plugins.json from {:?}",
+                installed_plugins_path
+            );
 
             if let Ok(content) = fs::read_to_string(&installed_plugins_path) {
                 if let Ok(installed) = serde_json::from_str::<serde_json::Value>(&content) {
                     // Parse plugins from installed_plugins.json
                     // Format: { "version": 2, "plugins": { "plugin-name@marketplace": [{ scope, installPath, ... }] } }
-                    if let Some(plugins_obj) = installed.get("plugins").and_then(|p| p.as_object()) {
+                    if let Some(plugins_obj) = installed.get("plugins").and_then(|p| p.as_object())
+                    {
                         for (plugin_key, installations) in plugins_obj {
                             // plugin_key format: "plugin-name@marketplace"
                             let parts: Vec<&str> = plugin_key.split('@').collect();
@@ -343,7 +347,9 @@ pub async fn list_plugins(_project_path: Option<String>) -> Result<Vec<PluginInf
                             let marketplace = parts.get(1).map(|s| s.to_string());
 
                             // Get the first (active) installation
-                            if let Some(installation) = installations.as_array().and_then(|arr| arr.first()) {
+                            if let Some(installation) =
+                                installations.as_array().and_then(|arr| arr.first())
+                            {
                                 let install_path = installation
                                     .get("installPath")
                                     .and_then(|v| v.as_str())
@@ -368,11 +374,18 @@ pub async fn list_plugins(_project_path: Option<String>) -> Result<Vec<PluginInf
 
                                 // Read plugin.json from install path for detailed info
                                 let install_dir = Path::new(install_path);
-                                let plugin_json_path = install_dir.join(".claude-plugin").join("plugin.json");
+                                let plugin_json_path =
+                                    install_dir.join(".claude-plugin").join("plugin.json");
 
                                 let (description, author) = if plugin_json_path.exists() {
-                                    if let Ok(manifest_content) = fs::read_to_string(&plugin_json_path) {
-                                        if let Ok(manifest) = serde_json::from_str::<serde_json::Value>(&manifest_content) {
+                                    if let Ok(manifest_content) =
+                                        fs::read_to_string(&plugin_json_path)
+                                    {
+                                        if let Ok(manifest) =
+                                            serde_json::from_str::<serde_json::Value>(
+                                                &manifest_content,
+                                            )
+                                        {
                                             let desc = manifest
                                                 .get("description")
                                                 .and_then(|v| v.as_str())
@@ -422,15 +435,20 @@ pub async fn list_plugins(_project_path: Option<String>) -> Result<Vec<PluginInf
                                     components,
                                 });
 
-                                debug!("Found plugin: {} (scope: {}, enabled: {})",
-                                    plugin_key, scope, enabled);
+                                debug!(
+                                    "Found plugin: {} (scope: {}, enabled: {})",
+                                    plugin_key, scope, enabled
+                                );
                             }
                         }
                     }
                 }
             }
         } else {
-            debug!("installed_plugins.json not found at {:?}", installed_plugins_path);
+            debug!(
+                "installed_plugins.json not found at {:?}",
+                installed_plugins_path
+            );
         }
     }
 
@@ -538,7 +556,9 @@ fn count_plugin_components(plugin_dir: &Path) -> PluginComponents {
                 None
             };
 
-            components.command_list.push(PluginComponentItem { name, description });
+            components
+                .command_list
+                .push(PluginComponentItem { name, description });
         }
         components.commands = components.command_list.len();
     }
@@ -565,7 +585,9 @@ fn count_plugin_components(plugin_dir: &Path) -> PluginComponents {
                 None
             };
 
-            components.agent_list.push(PluginComponentItem { name, description });
+            components
+                .agent_list
+                .push(PluginComponentItem { name, description });
         }
         components.agents = components.agent_list.len();
     }
@@ -600,7 +622,9 @@ fn count_plugin_components(plugin_dir: &Path) -> PluginComponents {
                 None
             };
 
-            components.skill_list.push(PluginComponentItem { name, description });
+            components
+                .skill_list
+                .push(PluginComponentItem { name, description });
         }
         components.skills = components.skill_list.len();
     }
@@ -1074,10 +1098,7 @@ fn scan_commands_directory(dir: &Path, scope: &str) -> Result<Vec<CustomSlashCom
         // 1. Flat: commands/my-command.md -> "my-command"
         // 2. Nested: commands/my-command/index.md -> "my-command"
         // 3. With args: commands/my-command/$ARGUMENTS.md -> "my-command" (with arg hint)
-        let file_name = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("");
+        let file_name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
 
         let parent_name = path
             .parent()
@@ -1086,7 +1107,9 @@ fn scan_commands_directory(dir: &Path, scope: &str) -> Result<Vec<CustomSlashCom
             .unwrap_or("");
 
         // Skip if file is directly in commands dir but named something weird
-        let name = if parent_name == "commands" || parent_name == dir.file_name().and_then(|s| s.to_str()).unwrap_or("") {
+        let name = if parent_name == "commands"
+            || parent_name == dir.file_name().and_then(|s| s.to_str()).unwrap_or("")
+        {
             // Flat structure: commands/my-command.md
             file_name.to_string()
         } else if file_name == "index" || file_name.starts_with('$') {
@@ -1176,7 +1199,10 @@ fn parse_gemini_command_toml(content: &str) -> (Option<String>, Option<String>) 
     // Fallback: try to extract description from comments or first line
     let first_line = content.lines().next().unwrap_or("");
     if first_line.starts_with('#') {
-        return (Some(first_line.trim_start_matches('#').trim().to_string()), None);
+        return (
+            Some(first_line.trim_start_matches('#').trim().to_string()),
+            None,
+        );
     }
 
     (None, None)
@@ -1203,7 +1229,10 @@ pub async fn list_gemini_custom_slash_commands(
     if let Some(proj_path) = project_path {
         let project_commands_dir = Path::new(&proj_path).join(".gemini").join("commands");
         if project_commands_dir.exists() {
-            commands.extend(scan_gemini_commands_directory(&project_commands_dir, "project")?);
+            commands.extend(scan_gemini_commands_directory(
+                &project_commands_dir,
+                "project",
+            )?);
         }
     }
 
@@ -1213,7 +1242,10 @@ pub async fn list_gemini_custom_slash_commands(
 
 /// Scan Gemini commands directory for .toml files
 /// Handles both flat files (command.toml) and nested directories (namespace/command.toml)
-fn scan_gemini_commands_directory(dir: &Path, scope: &str) -> Result<Vec<CustomSlashCommand>, String> {
+fn scan_gemini_commands_directory(
+    dir: &Path,
+    scope: &str,
+) -> Result<Vec<CustomSlashCommand>, String> {
     let mut commands = Vec::new();
 
     for entry in WalkDir::new(dir)
@@ -1231,10 +1263,7 @@ fn scan_gemini_commands_directory(dir: &Path, scope: &str) -> Result<Vec<CustomS
         // Determine command name based on file structure
         // 1. Flat: commands/my-command.toml -> "my-command"
         // 2. Namespaced: commands/git/commit.toml -> "git:commit"
-        let file_name = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("");
+        let file_name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
 
         let parent_name = path
             .parent()

@@ -17,6 +17,8 @@ interface GeneralSettingsProps {
   updateSetting: (key: string, value: any) => void;
   disableRewindGitOps: boolean;
   handleRewindGitOpsToggle: (checked: boolean) => void;
+  disablePromptAutoCommit: boolean;
+  handlePromptAutoCommitToggle: (checked: boolean) => void;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
 }
 
@@ -25,6 +27,8 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
   updateSetting,
   disableRewindGitOps,
   handleRewindGitOpsToggle,
+  disablePromptAutoCommit,
+  handlePromptAutoCommitToggle,
   setToast
 }) => {
   const { t } = useTranslation();
@@ -359,6 +363,21 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
               id="promptSuggestion"
               checked={enablePromptSuggestion}
               onCheckedChange={handlePromptSuggestionToggle}
+            />
+          </div>
+
+          {/* Disable Rewind Git Operations */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5 flex-1">
+              <Label htmlFor="disablePromptAutoCommit">{t('generalSettings.disablePromptAutoCommit')}</Label>
+              <p className="text-xs text-muted-foreground">
+                {t('generalSettings.disablePromptAutoCommitDescription')}
+              </p>
+            </div>
+            <Switch
+              id="disablePromptAutoCommit"
+              checked={disablePromptAutoCommit}
+              onCheckedChange={handlePromptAutoCommitToggle}
             />
           </div>
 

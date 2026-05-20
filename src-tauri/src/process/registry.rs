@@ -153,21 +153,19 @@ impl ProcessRegistry {
                 pid
             );
             match JobObject::create() {
-                Ok(job) => {
-                    match job.assign_process_by_pid(pid) {
-                        Ok(_) => {
-                            log::info!(
-                                "Assigned process {} to Job Object for automatic cleanup",
-                                pid
-                            );
-                            Some(Arc::new(job))
-                        }
-                        Err(e) => {
-                            log::warn!("Failed to assign process {} to Job Object: {}", pid, e);
-                            None
-                        }
+                Ok(job) => match job.assign_process_by_pid(pid) {
+                    Ok(_) => {
+                        log::info!(
+                            "Assigned process {} to Job Object for automatic cleanup",
+                            pid
+                        );
+                        Some(Arc::new(job))
                     }
-                }
+                    Err(e) => {
+                        log::warn!("Failed to assign process {} to Job Object: {}", pid, e);
+                        None
+                    }
+                },
                 Err(e) => {
                     log::warn!("Failed to create Job Object: {}", e);
                     None

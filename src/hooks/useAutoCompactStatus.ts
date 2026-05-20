@@ -108,13 +108,16 @@ export const useAutoCompactStatus = (options: UseAutoCompactStatusOptions = {}):
         try {
           const sessionStats = await api.getSessionContextStats(sessionId);
           if (sessionStats) {
+            const sessionStatus = sessionStats.status;
             setStatus(prev => ({
               ...prev,
               compactionCount: sessionStats.compaction_count || 0,
               lastCompaction: sessionStats.last_compaction
                 ? new Date(sessionStats.last_compaction)
                 : null,
-              isCompacting: sessionStats.status === 'Compacting',
+              isCompacting:
+                sessionStatus === 'Compacting' ||
+                sessionStatus === 'CompactionPending',
             }));
           }
         } catch (e) {

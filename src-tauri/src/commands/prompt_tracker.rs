@@ -596,28 +596,34 @@ pub async fn mark_prompt_completed(
         return Ok(());
     }
 
-    // Auto-commit any changes made by AI
-    // This ensures each prompt has a distinct git state
-    let commit_message =
-        build_prompt_commit_message("[Claude Code]", prompt_text.as_deref(), prompt_index);
-    match simple_git::git_commit_changes(&project_path, &commit_message) {
-        Ok(true) => {
-            log::info!("Auto-committed changes after prompt #{}", prompt_index);
-        }
-        Ok(false) => {
-            log::debug!("No changes to commit after prompt #{}", prompt_index);
-        }
-        Err(e) => {
-            log::warn!(
-                "Failed to auto-commit after prompt #{}: {}",
-                prompt_index,
-                e
-            );
-            // Continue anyway, don't fail the whole operation
+    if execution_config.disable_prompt_auto_commit {
+        log::info!(
+            "[Mark Complete] Prompt auto-commit disabled, keeping working tree without Git commit"
+        );
+    } else {
+        // Auto-commit any changes made by AI
+        // This ensures each prompt has a distinct git state
+        let commit_message =
+            build_prompt_commit_message("[Claude Code]", prompt_text.as_deref(), prompt_index);
+        match simple_git::git_commit_changes(&project_path, &commit_message) {
+            Ok(true) => {
+                log::info!("Auto-committed changes after prompt #{}", prompt_index);
+            }
+            Ok(false) => {
+                log::debug!("No changes to commit after prompt #{}", prompt_index);
+            }
+            Err(e) => {
+                log::warn!(
+                    "Failed to auto-commit after prompt #{}: {}",
+                    prompt_index,
+                    e
+                );
+                // Continue anyway, don't fail the whole operation
+            }
         }
     }
 
-    // Get current commit (state after AI completion and auto-commit)
+    // Get current commit (state after AI completion)
     let commit_after = simple_git::git_current_commit(&project_path)
         .map_err(|e| format!("Failed to get current commit: {}", e))?;
 
@@ -722,7 +728,10 @@ pub async fn revert_to_prompt(
         }
 
         RewindMode::CodeOnly => {
-            log::info!("Reverting code only (keeping messages) - revert to state before prompt #{}", prompt_index);
+            log::info!(
+                "Reverting code only (keeping messages) - revert to state before prompt #{}",
+                prompt_index
+            );
 
             // 1. Stash any uncommitted changes
             simple_git::git_stash_save(
@@ -769,7 +778,10 @@ pub async fn revert_to_prompt(
                 let commit_after = match &record.commit_after {
                     Some(c) if c != &record.commit_before => c.clone(),
                     _ => {
-                        log::debug!("[Precise Revert] Skipping prompt #{} - no code changes", idx);
+                        log::debug!(
+                            "[Precise Revert] Skipping prompt #{} - no code changes",
+                            idx
+                        );
                         continue;
                     }
                 };
@@ -864,7 +876,10 @@ pub async fn revert_to_prompt(
         }
 
         RewindMode::Both => {
-            log::info!("Reverting both conversation and code - revert to state before prompt #{}", prompt_index);
+            log::info!(
+                "Reverting both conversation and code - revert to state before prompt #{}",
+                prompt_index
+            );
 
             // 1. Stash any uncommitted changes
             simple_git::git_stash_save(
@@ -911,7 +926,10 @@ pub async fn revert_to_prompt(
                 let commit_after = match &record.commit_after {
                     Some(c) if c != &record.commit_before => c.clone(),
                     _ => {
-                        log::debug!("[Precise Revert] Skipping prompt #{} - no code changes", idx);
+                        log::debug!(
+                            "[Precise Revert] Skipping prompt #{} - no code changes",
+                            idx
+                        );
                         continue;
                     }
                 };
@@ -1013,7 +1031,8 @@ pub async fn revert_to_prompt(
                 );
 
                 // Attempt to rollback Git changes
-                if let Err(rollback_err) = simple_git::git_reset_hard(&project_path, &original_head) {
+                if let Err(rollback_err) = simple_git::git_reset_hard(&project_path, &original_head)
+                {
                     log::error!("[CRITICAL] Git rollback failed: {}", rollback_err);
                     return Err(format!(
                         "会话文件截断失败，且 Git 回滚也失败，仓库可能处于不一致状态。\n\
@@ -1035,14 +1054,18 @@ pub async fn revert_to_prompt(
             // 🔧 ATOMIC PROTECTION: If git records truncation fails, rollback Git changes
             // Note: Session file is already truncated at this point, cannot easily rollback
             if !git_operations_disabled {
-                if let Err(e) = truncate_git_records(&session_id, &project_id, &prompts, prompt_index) {
+                if let Err(e) =
+                    truncate_git_records(&session_id, &project_id, &prompts, prompt_index)
+                {
                     log::error!(
                         "[Atomic Rollback] Git records truncation failed, rolling back Git: {}",
                         e
                     );
 
                     // Attempt to rollback Git changes
-                    if let Err(rollback_err) = simple_git::git_reset_hard(&project_path, &original_head) {
+                    if let Err(rollback_err) =
+                        simple_git::git_reset_hard(&project_path, &original_head)
+                    {
                         log::error!("[CRITICAL] Git rollback failed: {}", rollback_err);
                         return Err(format!(
                             "Git 记录截断失败，且 Git 回滚也失败。\n\
@@ -1143,8 +1166,13 @@ pub async fn check_rewind_capabilities(
             .map_err(|e| format!("Failed to get git record: {}", e))?;
 
         if let Some(record) = git_record {
-            let has_valid_commit =
-                !record.commit_before.is_empty() && record.commit_before != "NONE";
+            let has_valid_commit = !record.commit_before.is_empty()
+                && record.commit_before != "NONE"
+                && record
+                    .commit_after
+                    .as_ref()
+                    .map(|commit_after| commit_after != &record.commit_before)
+                    .unwrap_or(false);
 
             log::info!(
                 "[Rewind Check] ✅ Project prompt #{} with git record: has_valid_commit={}",

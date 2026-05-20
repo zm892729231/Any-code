@@ -32,8 +32,7 @@ pub use claude::{
     sync_single_server_to_claude,
 };
 pub use codex::{
-    import_from_codex, remove_server_from_codex, sync_servers_to_codex,
-    sync_single_server_to_codex,
+    import_from_codex, remove_server_from_codex, sync_servers_to_codex, sync_single_server_to_codex,
 };
 pub use gemini::{
     import_from_gemini, remove_server_from_gemini, sync_servers_to_gemini,
@@ -138,11 +137,7 @@ pub struct McpServer {
 }
 
 /// 将单个 MCP 服务器同步到指定应用
-pub fn sync_server_to_app(
-    id: &str,
-    server_spec: &Value,
-    app: &AppType,
-) -> Result<(), String> {
+pub fn sync_server_to_app(id: &str, server_spec: &Value, app: &AppType) -> Result<(), String> {
     match app {
         AppType::Claude => sync_single_server_to_claude(id, server_spec),
         AppType::Codex => sync_single_server_to_codex(id, server_spec),
@@ -185,10 +180,7 @@ pub fn import_from_app(app: &AppType) -> Result<HashMap<String, Value>, String> 
 }
 
 /// 将多个服务器同步到指定应用
-pub fn sync_servers_to_app(
-    servers: &HashMap<String, Value>,
-    app: &AppType,
-) -> Result<(), String> {
+pub fn sync_servers_to_app(servers: &HashMap<String, Value>, app: &AppType) -> Result<(), String> {
     match app {
         AppType::Claude => sync_servers_to_claude(servers),
         AppType::Codex => sync_servers_to_codex(servers),

@@ -38,16 +38,16 @@ pub fn read_mcp_servers_map() -> Result<HashMap<String, Value>, String> {
         return Ok(HashMap::new());
     }
 
-    let content = fs::read_to_string(&path)
-        .map_err(|e| format!("读取 Codex 配置文件失败: {}", e))?;
+    let content =
+        fs::read_to_string(&path).map_err(|e| format!("读取 Codex 配置文件失败: {}", e))?;
 
     if content.trim().is_empty() {
         log::info!("Codex 配置文件为空");
         return Ok(HashMap::new());
     }
 
-    let root: toml::Table = toml::from_str(&content)
-        .map_err(|e| format!("解析 Codex config.toml 失败: {}", e))?;
+    let root: toml::Table =
+        toml::from_str(&content).map_err(|e| format!("解析 Codex config.toml 失败: {}", e))?;
 
     let mut result = HashMap::new();
 
@@ -170,8 +170,8 @@ pub fn set_mcp_servers_map(servers: &HashMap<String, Value>) -> Result<(), Strin
 
     // 读取现有配置（保留其他字段）
     let mut doc = if path.exists() {
-        let content = fs::read_to_string(&path)
-            .map_err(|e| format!("读取 Codex 配置失败: {}", e))?;
+        let content =
+            fs::read_to_string(&path).map_err(|e| format!("读取 Codex 配置失败: {}", e))?;
         content
             .parse::<DocumentMut>()
             .map_err(|e| format!("解析 Codex config.toml 失败: {}", e))?

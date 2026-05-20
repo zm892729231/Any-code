@@ -16,7 +16,10 @@ use super::parser::{
     convert_raw_to_unified_message, convert_to_unified_message, parse_gemini_line,
     parse_gemini_line_flexible,
 };
-use super::types::{GeminiExecutionOptions, GeminiInstallStatus, GeminiProcessHandle, GeminiProcessState, GeminiSessionDetail, TokenUsage};
+use super::types::{
+    GeminiExecutionOptions, GeminiInstallStatus, GeminiProcessHandle, GeminiProcessState,
+    GeminiSessionDetail, TokenUsage,
+};
 use crate::claude_binary::detect_binary_for_tool;
 use crate::commands::claude::apply_no_window_async;
 use crate::commands::wsl_utils;
@@ -89,10 +92,12 @@ async fn try_load_latest_session_token_usage(
         let project_path = project_path.to_string();
         let session_id = session_id.to_string();
 
-        let detail = tokio::task::spawn_blocking(move || read_session_detail(&project_path, &session_id).ok())
-            .await
-            .ok()
-            .flatten();
+        let detail = tokio::task::spawn_blocking(move || {
+            read_session_detail(&project_path, &session_id).ok()
+        })
+        .await
+        .ok()
+        .flatten();
 
         if let Some(detail) = detail {
             if let Some(usage) = extract_latest_token_usage(&detail) {
@@ -453,10 +458,7 @@ pub async fn execute_gemini(
                 let wsl_runtime = wsl_utils::get_gemini_wsl_runtime();
                 dirs.iter()
                     .map(|d| {
-                        wsl_utils::windows_to_wsl_path_with_distro(
-                            d,
-                            wsl_runtime.distro.as_deref(),
-                        )
+                        wsl_utils::windows_to_wsl_path_with_distro(d, wsl_runtime.distro.as_deref())
                     })
                     .collect::<Vec<_>>()
                     .join(",")
@@ -562,7 +564,11 @@ pub async fn cancel_gemini(
                 .kill()
                 .await
                 .map_err(|e| format!("Failed to kill process: {}", e))?;
-            log::info!("Killed Gemini process for session: {} (PID: {})", sid, handle.pid);
+            log::info!(
+                "Killed Gemini process for session: {} (PID: {})",
+                sid,
+                handle.pid
+            );
 
             // JobObject is dropped here, killing all child processes (MCP servers, node.exe, etc.)
             drop(handle.job_object);
@@ -579,7 +585,11 @@ pub async fn cancel_gemini(
             if let Err(e) = handle.child.kill().await {
                 log::error!("Failed to kill process for session {}: {}", sid, e);
             } else {
-                log::info!("Killed Gemini process for session: {} (PID: {})", sid, handle.pid);
+                log::info!(
+                    "Killed Gemini process for session: {} (PID: {})",
+                    sid,
+                    handle.pid
+                );
             }
             // JobObject is dropped here, killing all child processes
             drop(handle.job_object);
@@ -798,10 +808,7 @@ async fn execute_gemini_process(
                 }
 
                 // Ensure result events have usageMetadata (cache/thoughts/tool breakdown) when available in history.
-                if let super::types::GeminiStreamEvent::Result {
-                    usage_metadata, ..
-                } = &mut event
-                {
+                if let super::types::GeminiStreamEvent::Result { usage_metadata, .. } = &mut event {
                     if usage_metadata.is_none() {
                         if let Some(ref cli_session_id) = real_cli_session_id {
                             if let Some(enriched) = try_load_latest_session_token_usage(
@@ -943,7 +950,9 @@ async fn execute_gemini_process(
 
                 let should_set_model = match obj.get("model") {
                     None => true,
-                    Some(v) => v.is_null() || v.as_str().map(|s| s.trim().is_empty()).unwrap_or(false),
+                    Some(v) => {
+                        v.is_null() || v.as_str().map(|s| s.trim().is_empty()).unwrap_or(false)
+                    }
                 };
                 if should_set_model {
                     obj.insert(
@@ -1070,7 +1079,10 @@ async fn execute_gemini_process(
                         log::error!("[Gemini] Failed to kill hung process: {}", e);
                     }
                     // JobObject is dropped here, killing all child processes
-                    log::info!("[Gemini] Force-dropped JobObject for hung process PID: {}", handle.pid);
+                    log::info!(
+                        "[Gemini] Force-dropped JobObject for hung process PID: {}",
+                        handle.pid
+                    );
                 }
                 (false, None)
             }

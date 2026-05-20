@@ -43,6 +43,12 @@ export const SessionWindow: React.FC = () => {
 
   // Parse URL parameters on mount
   const windowParams = useMemo(() => parseSessionWindowParams(), []);
+  const planModeStorageKey = useMemo(() => {
+    if (windowParams.sessionId) return `plan-mode:session:${windowParams.sessionId}`;
+    if (windowParams.projectPath) return `plan-mode:path:${windowParams.projectPath.replace(/\\/g, '/').toLowerCase()}`;
+    if (windowParams.tabId) return `plan-mode:tab:${windowParams.tabId}`;
+    return `plan-mode:window`;
+  }, [windowParams.sessionId, windowParams.projectPath, windowParams.tabId]);
 
   // Initialize session from URL parameters
   useEffect(() => {
@@ -410,6 +416,7 @@ export const SessionWindow: React.FC = () => {
               initialProjectPath={state.projectPath || undefined}
               session={state.session || undefined}
               isActive={true}
+              planModeStorageKey={planModeStorageKey}
             />
           </PlanModeProvider>
         </MessagesProvider>

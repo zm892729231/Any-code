@@ -102,6 +102,7 @@ export const Settings: React.FC<SettingsProps> = ({
   // Execution config state
   const [executionConfig, setExecutionConfig] = useState<ClaudeExecutionConfig | null>(null);
   const [disableRewindGitOps, setDisableRewindGitOps] = useState(false);
+  const [disablePromptAutoCommit, setDisablePromptAutoCommit] = useState(false);
   const [showRewindGitConfirmDialog, setShowRewindGitConfirmDialog] = useState(false);
   
   // Hooks state
@@ -140,6 +141,7 @@ export const Settings: React.FC<SettingsProps> = ({
         const execConfig = await api.getClaudeExecutionConfig();
         setExecutionConfig(execConfig);
         setDisableRewindGitOps(execConfig.disable_rewind_git_operations || false);
+        setDisablePromptAutoCommit(execConfig.disable_prompt_auto_commit || false);
       } catch (err) {
         console.error("Failed to load execution config:", err);
         // Continue with default values
@@ -232,6 +234,7 @@ export const Settings: React.FC<SettingsProps> = ({
         const updatedExecConfig = {
           ...executionConfig,
           disable_rewind_git_operations: disableRewindGitOps,
+          disable_prompt_auto_commit: disablePromptAutoCommit,
         };
         await api.updateClaudeExecutionConfig(updatedExecConfig);
         setExecutionConfig(updatedExecConfig);
@@ -272,6 +275,10 @@ export const Settings: React.FC<SettingsProps> = ({
       // Directly disable without confirmation
       setDisableRewindGitOps(false);
     }
+  };
+
+  const handlePromptAutoCommitToggle = (checked: boolean) => {
+    setDisablePromptAutoCommit(checked);
   };
 
   /**
@@ -453,6 +460,8 @@ export const Settings: React.FC<SettingsProps> = ({
                 updateSetting={updateSetting}
                 disableRewindGitOps={disableRewindGitOps}
                 handleRewindGitOpsToggle={handleRewindGitOpsToggle}
+                disablePromptAutoCommit={disablePromptAutoCommit}
+                handlePromptAutoCommitToggle={handlePromptAutoCommitToggle}
                 setToast={setToast}
               />
             </TabsContent>

@@ -167,6 +167,7 @@ export const AutoCompactSettings: React.FC<AutoCompactSettingsProps> = ({
 
   const getSessionStatusIcon = (status: SessionContext['status']) => {
     if (status === 'Active') return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+    if (status === 'CompactionPending') return <Timer className="h-4 w-4 text-amber-500" />;
     if (status === 'Compacting') return <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />;
     if (status === 'Idle') return <Clock className="h-4 w-4 text-yellow-500" />;
     return <XCircle className="h-4 w-4 text-red-500" />;
@@ -174,6 +175,7 @@ export const AutoCompactSettings: React.FC<AutoCompactSettingsProps> = ({
 
   const getSessionStatusText = (status: SessionContext['status']) => {
     if (status === 'Active') return t('autoCompact.active');
+    if (status === 'CompactionPending') return t('autoCompact.pendingCompaction');
     if (status === 'Compacting') return t('autoCompact.compacting');
     if (status === 'Idle') return t('autoCompact.idle');
     if (typeof status === 'object' && 'CompactionFailed' in status) {

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 /// based on Claude Code SDK best practices and the official documentation.
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tokio::time::sleep;
 
 /// Event payload for compaction status changes
@@ -15,7 +15,7 @@ use tokio::time::sleep;
 pub struct CompactionEvent {
     pub session_id: String,
     pub event_type: CompactionEventType,
-    pub progress: Option<u8>,  // 0-100
+    pub progress: Option<u8>, // 0-100
     pub message: Option<String>,
     pub tokens_before: Option<usize>,
     pub tokens_after: Option<usize>,
@@ -106,10 +106,11 @@ mod systemtime_serde {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SessionStatus {
     Active,
     Idle,
+    CompactionPending,
     Compacting,
     CompactionFailed(String),
 }
@@ -144,6 +145,47 @@ impl AutoCompactManager {
             config: Arc::new(Mutex::new(AutoCompactConfig::default())),
             is_monitoring: Arc::new(Mutex::new(false)),
         }
+    }
+
+    /// 标记会话已进入待压缩状态或正在压缩，避免重复触发
+    fn has_compaction_in_flight(status: &SessionStatus) -> bool {
+        matches!(
+            status,
+            SessionStatus::CompactionPending | SessionStatus::Compacting
+        )
+    }
+
+    /// 将待压缩会话原子地抢占为“压缩执行中”
+    fn claim_pending_compaction(&self, session_id: &str) -> Result<bool, String> {
+        let mut sessions = self.sessions.lock().map_err(|e| e.to_string())?;
+        let Some(session) = sessions.get_mut(session_id) else {
+            return Ok(false);
+        };
+
+        if matches!(session.status, SessionStatus::CompactionPending) {
+            session.status = SessionStatus::Compacting;
+            return Ok(true);
+        }
+
+        Ok(false)
+    }
+
+    /// 手动触发时直接标记为“压缩执行中”
+    pub fn mark_compaction_running(&self, session_id: &str) -> Result<(), String> {
+        let mut sessions = self.sessions.lock().map_err(|e| e.to_string())?;
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| format!("Session {} not found", session_id))?;
+
+        if matches!(session.status, SessionStatus::Compacting) {
+            return Err(format!(
+                "Compaction already running for session {}",
+                session_id
+            ));
+        }
+
+        session.status = SessionStatus::Compacting;
+        Ok(())
     }
 
     /// Register a new session for monitoring
@@ -207,11 +249,15 @@ impl AutoCompactManager {
             };
 
             if needs_compaction && interval_ok {
+                if Self::has_compaction_in_flight(&session.status) {
+                    return Ok(false);
+                }
+
                 info!(
                     "Auto-compaction triggered for session {}: {} tokens (threshold: {})",
                     session_id, token_count, threshold_tokens
                 );
-                session.status = SessionStatus::Compacting;
+                session.status = SessionStatus::CompactionPending;
                 return Ok(true);
             }
         }
@@ -243,31 +289,37 @@ impl AutoCompactManager {
         };
 
         // Emit compaction started event
-        let _ = app.emit("auto-compact-event", CompactionEvent {
-            session_id: session_id.to_string(),
-            event_type: CompactionEventType::Started,
-            progress: Some(0),
-            message: Some("正在优化上下文...".to_string()),
-            tokens_before: Some(tokens_before),
-            tokens_after: None,
-        });
+        let _ = app.emit(
+            "auto-compact-event",
+            CompactionEvent {
+                session_id: session_id.to_string(),
+                event_type: CompactionEventType::Started,
+                progress: Some(0),
+                message: Some("正在优化上下文...".to_string()),
+                tokens_before: Some(tokens_before),
+                tokens_after: None,
+            },
+        );
 
         // Build compaction command based on strategy
         let compaction_cmd = self.build_compaction_command(&custom_instructions).await?;
 
         // Emit in-progress event
-        let _ = app.emit("auto-compact-event", CompactionEvent {
-            session_id: session_id.to_string(),
-            event_type: CompactionEventType::InProgress,
-            progress: Some(50),
-            message: Some("正在压缩会话历史...".to_string()),
-            tokens_before: Some(tokens_before),
-            tokens_after: None,
-        });
+        let _ = app.emit(
+            "auto-compact-event",
+            CompactionEvent {
+                session_id: session_id.to_string(),
+                event_type: CompactionEventType::InProgress,
+                progress: Some(50),
+                message: Some("正在压缩会话历史...".to_string()),
+                tokens_before: Some(tokens_before),
+                tokens_after: None,
+            },
+        );
 
         // Execute compaction using Claude CLI
         match self
-            .execute_claude_compaction(&app, &project_path, &compaction_cmd)
+            .execute_claude_compaction(&app, session_id, &project_path, &compaction_cmd)
             .await
         {
             Ok(_) => {
@@ -289,14 +341,17 @@ impl AutoCompactManager {
                 };
 
                 // Emit compaction completed event
-                let _ = app.emit("auto-compact-event", CompactionEvent {
-                    session_id: session_id.to_string(),
-                    event_type: CompactionEventType::Completed,
-                    progress: Some(100),
-                    message: Some("上下文优化完成".to_string()),
-                    tokens_before: Some(tokens_before),
-                    tokens_after: Some(tokens_after),
-                });
+                let _ = app.emit(
+                    "auto-compact-event",
+                    CompactionEvent {
+                        session_id: session_id.to_string(),
+                        event_type: CompactionEventType::Completed,
+                        progress: Some(100),
+                        message: Some("上下文优化完成".to_string()),
+                        tokens_before: Some(tokens_before),
+                        tokens_after: Some(tokens_after),
+                    },
+                );
 
                 Ok(())
             }
@@ -309,14 +364,17 @@ impl AutoCompactManager {
                 error!("Auto-compaction failed for session {}: {}", session_id, e);
 
                 // Emit compaction failed event
-                let _ = app.emit("auto-compact-event", CompactionEvent {
-                    session_id: session_id.to_string(),
-                    event_type: CompactionEventType::Failed,
-                    progress: Some(0),
-                    message: Some(format!("压缩失败: {}", e)),
-                    tokens_before: Some(tokens_before),
-                    tokens_after: None,
-                });
+                let _ = app.emit(
+                    "auto-compact-event",
+                    CompactionEvent {
+                        session_id: session_id.to_string(),
+                        event_type: CompactionEventType::Failed,
+                        progress: Some(0),
+                        message: Some(format!("压缩失败: {}", e)),
+                        tokens_before: Some(tokens_before),
+                        tokens_after: None,
+                    },
+                );
 
                 Err(e)
             }
@@ -363,41 +421,48 @@ impl AutoCompactManager {
     async fn execute_claude_compaction(
         &self,
         app: &tauri::AppHandle,
+        session_id: &str,
         project_path: &str,
         instructions: &str,
     ) -> Result<(), String> {
         // Find Claude CLI binary
         let claude_path = crate::claude_binary::find_claude_binary(app)?;
 
+        // /compact 必须绑定到原会话执行，否则 Claude 会新建一个临时会话，
+        // 导致会话列表中出现“没有历史可压缩”的伪会话。
+        let compact_prompt = {
+            let normalized = instructions
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ");
+            if normalized.is_empty() {
+                "/compact".to_string()
+            } else {
+                format!("/compact {}", normalized)
+            }
+        };
+
         // Build compaction command
         let mut cmd = tokio::process::Command::new(&claude_path);
-        cmd.args(&["/compact"])
-            .current_dir(project_path)
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped());
+        cmd.args([
+            "--resume",
+            session_id,
+            "--output-format",
+            "text",
+            "-p",
+            &compact_prompt,
+        ])
+        .current_dir(project_path)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
 
         // 🔥 Fix: Apply platform-specific no-window configuration to hide console
         crate::commands::claude::apply_no_window_async(&mut cmd);
 
         // Execute compaction
-        let mut child = cmd
+        let child = cmd
             .spawn()
             .map_err(|e| format!("Failed to spawn compaction process: {}", e))?;
-
-        // Send instructions to stdin
-        if let Some(stdin) = child.stdin.take() {
-            use tokio::io::AsyncWriteExt;
-            let mut stdin = stdin;
-            stdin
-                .write_all(instructions.as_bytes())
-                .await
-                .map_err(|e| format!("Failed to write compaction instructions: {}", e))?;
-            stdin
-                .shutdown()
-                .await
-                .map_err(|e| format!("Failed to close stdin: {}", e))?;
-        }
 
         // Wait for completion
         let output = child
@@ -407,7 +472,17 @@ impl AutoCompactManager {
 
         if !output.status.success() {
             let error = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Compaction failed: {}", error));
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            return Err(format!(
+                "Compaction failed: {}{}{}",
+                error.trim(),
+                if error.trim().is_empty() || stdout.trim().is_empty() {
+                    ""
+                } else {
+                    " | "
+                },
+                stdout.trim()
+            ));
         }
 
         Ok(())
@@ -451,13 +526,27 @@ impl AutoCompactManager {
                         }
 
                         if let Some(session) = sessions.get(&session_id) {
-                            matches!(session.status, SessionStatus::Compacting)
+                            matches!(session.status, SessionStatus::CompactionPending)
                         } else {
                             false
                         }
                     };
 
+                    let session_is_running = app
+                        .try_state::<crate::process::ProcessRegistryState>()
+                        .and_then(|registry| registry.0.get_claude_session_by_id(&session_id).ok())
+                        .flatten()
+                        .is_some();
+
                     if needs_compaction {
+                        if session_is_running {
+                            info!(
+                                "Session {} is still running, deferring auto-compaction until it becomes idle",
+                                session_id
+                            );
+                            continue;
+                        }
+
                         // Execute compaction in a separate task
                         let app_clone = app.clone();
                         let session_id_clone = session_id.clone();
@@ -466,6 +555,14 @@ impl AutoCompactManager {
                             config: config.clone(),
                             is_monitoring: is_monitoring_flag.clone(),
                         };
+
+                        let claimed = manager
+                            .claim_pending_compaction(&session_id)
+                            .unwrap_or(false);
+
+                        if !claimed {
+                            continue;
+                        }
 
                         tokio::spawn(async move {
                             if let Err(e) = manager
@@ -534,3 +631,67 @@ impl AutoCompactManager {
 /// State wrapper for AutoCompactManager
 #[derive(Clone)]
 pub struct AutoCompactState(pub Arc<AutoCompactManager>);
+
+#[cfg(test)]
+mod tests {
+    use super::{AutoCompactManager, SessionStatus};
+
+    #[tokio::test]
+    async fn auto_compaction_is_only_queued_once_before_execution() {
+        let manager = AutoCompactManager::new();
+        manager
+            .register_session(
+                "session-1".to_string(),
+                "D:/project".to_string(),
+                "claude-sonnet-4".to_string(),
+            )
+            .unwrap();
+
+        assert!(manager
+            .update_session_tokens("session-1", 102_000)
+            .await
+            .unwrap());
+
+        let stats = manager
+            .get_session_stats("session-1")
+            .unwrap()
+            .expect("session stats should exist");
+        assert_eq!(stats.status, SessionStatus::CompactionPending);
+
+        assert!(!manager
+            .update_session_tokens("session-1", 103_000)
+            .await
+            .unwrap());
+
+        let stats = manager
+            .get_session_stats("session-1")
+            .unwrap()
+            .expect("session stats should exist");
+        assert_eq!(stats.status, SessionStatus::CompactionPending);
+    }
+
+    #[tokio::test]
+    async fn pending_compaction_can_only_be_claimed_once() {
+        let manager = AutoCompactManager::new();
+        manager
+            .register_session(
+                "session-2".to_string(),
+                "D:/project".to_string(),
+                "claude-sonnet-4".to_string(),
+            )
+            .unwrap();
+
+        assert!(manager
+            .update_session_tokens("session-2", 102_000)
+            .await
+            .unwrap());
+        assert!(manager.claim_pending_compaction("session-2").unwrap());
+        assert!(!manager.claim_pending_compaction("session-2").unwrap());
+
+        let stats = manager
+            .get_session_stats("session-2")
+            .unwrap()
+            .expect("session stats should exist");
+        assert_eq!(stats.status, SessionStatus::Compacting);
+    }
+}

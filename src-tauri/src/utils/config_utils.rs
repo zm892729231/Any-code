@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 /// 通用配置管理工具模块
 ///
 /// 提供统一的JSON配置文件加载和保存功能，消除重复代码
@@ -18,10 +19,8 @@
 /// // 保存配置（自动创建父目录）
 /// save_json_config(&config, &path)?;
 /// ```
-
 use std::fs;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 
 /// 通用配置加载函数
 ///
@@ -100,8 +99,7 @@ where
         .map_err(|e| format!("Failed to serialize config: {}", e))?;
 
     // 写入文件
-    fs::write(path, content)
-        .map_err(|e| format!("Failed to write config to {:?}: {}", path, e))?;
+    fs::write(path, content).map_err(|e| format!("Failed to write config to {:?}: {}", path, e))?;
 
     log::debug!("Config saved successfully to {:?}", path);
     Ok(())
@@ -162,8 +160,7 @@ impl ConfigPathBuilder {
     /// // 结果: ~/.claude/settings.json
     /// ```
     pub fn from_home_subdir(subdir: &str) -> Result<Self, String> {
-        let home = dirs::home_dir()
-            .ok_or_else(|| "Failed to get home directory".to_string())?;
+        let home = dirs::home_dir().ok_or_else(|| "Failed to get home directory".to_string())?;
         Ok(Self::new(home.join(subdir)))
     }
 }
