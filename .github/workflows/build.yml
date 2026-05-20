@@ -253,21 +253,20 @@ jobs:
       - name: Create GitHub Release
         if: steps.check_release.outputs.exists == 'false'
         run: |
+          mapfile -t files < <(find artifacts -type f \( -name "*.dmg" -o -name "*.app.tar.gz" -o -name "*.app.tar.gz.sig" \
+            -o -name "*.msi" -o -name "*.msi.sig" -o -name "*-setup.exe" -o -name "*-setup.exe.sig" \
+            -o -name "*-portable.exe" -o -name "*.AppImage" -o -name "*.AppImage.sig" \
+            -o -name "*.deb" -o -name "*.rpm" \) -print)
+          files+=("latest.json")
+
+          if [ "${#files[@]}" -eq 1 ]; then
+            echo "::error::No release artifacts found."
+            exit 1
+          fi
+
           gh release create "${{ github.ref_name }}" \
             --title "Any Code ${{ github.ref_name }}" \
             --notes-file release-notes.md \
-            artifacts/**/*.dmg \
-            artifacts/**/*.app.tar.gz \
-            artifacts/**/*.app.tar.gz.sig \
-            artifacts/**/*.msi \
-            artifacts/**/*.msi.sig \
-            artifacts/**/*-setup.exe \
-            artifacts/**/*-setup.exe.sig \
-            artifacts/**/*-portable.exe \
-            artifacts/**/*.AppImage \
-            artifacts/**/*.AppImage.sig \
-            artifacts/**/*.deb \
-            artifacts/**/*.rpm \
-            latest.json
+            "${files[@]}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
